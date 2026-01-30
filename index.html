@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geolocation Test Harness</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+      max-width: 1200px; 
+      margin: 0 auto; 
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    h1 { color: #333; }
+    .section { 
+      background: white; 
+      border-radius: 8px; 
+      padding: 20px; 
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .section h2 { margin-top: 0; color: #555; }
+    button { 
+      background: #007bff; 
+      color: white; 
+      border: none; 
+      padding: 10px 20px; 
+      border-radius: 4px; 
+      cursor: pointer;
+      margin-right: 10px;
+      margin-bottom: 10px;
+    }
+    button:hover { background: #0056b3; }
+    button:disabled { background: #ccc; cursor: not-allowed; }
+    button.stop { background: #dc3545; }
+    button.stop:hover { background: #c82333; }
+    button.clear { background: #6c757d; }
+    .config { margin-bottom: 15px; }
+    .config label { display: inline-block; width: 180px; }
+    .config input { width: 100px; padding: 5px; }
+    .results { 
+      background: #f8f9fa; 
+      border: 1px solid #ddd; 
+      border-radius: 4px; 
+      padding: 15px; 
+      max-height: 400px; 
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 13px;
+    }
+    .result-item { 
+      padding: 10px; 
+      margin-bottom: 10px; 
+      border-radius: 4px;
+      border-left: 4px solid #007bff;
+      background: white;
+    }
+    .result-item.error { border-left-color: #dc3545; }
+    .result-item.success { border-left-color: #28a745; }
+    .result-item.synthetic { border-left-color: #ffc107; }
+    .result-item.timeout-test { border-left-color: #17a2b8; }
+    .timestamp { color: #666; font-size: 11px; }
+    .label { 
+      display: inline-block; 
+      padding: 2px 8px; 
+      border-radius: 3px; 
+      font-size: 11px; 
+      font-weight: bold;
+      margin-right: 8px;
+    }
+    .label.native { background: #007bff; color: white; }
+    .label.synthetic { background: #ffc107; color: black; }
+    .label.timeout { background: #17a2b8; color: white; }
+    .label.error { background: #dc3545; color: white; }
+    .metrics { 
+      display: grid; 
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+      gap: 15px; 
+      margin-top: 15px;
+    }
+    .metric { 
+      background: #e9ecef; 
+      padding: 15px; 
+      border-radius: 4px; 
+      text-align: center;
+    }
+    .metric-value { font-size: 24px; font-weight: bold; color: #333; }
+    .metric-label { font-size: 12px; color: #666; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+    th { background: #f1f1f1; }
+    .status { padding: 5px 10px; border-radius: 4px; display: inline-block; }
+    .status.running { background: #d4edda; color: #155724; }
+    .status.stopped { background: #f8d7da; color: #721c24; }
+    .status.idle { background: #e2e3e5; color: #383d41; }
+  </style>
+</head>
+<body>
+  <h1>🌍 Geolocation Test Harness</h1>
+  
+  <!-- Quick Timeout Test Section -->
+  <div class="section">
+    <h2>⚡ Quick Timeout Spoof Detection Test</h2>
+    <p>Tests if location can be obtained with very short timeouts (20ms, 30ms, 50ms). Real GPS/WiFi should <strong>fail</strong>; spoofed locations may <strong>succeed</strong>.</p>
+    
+    <div class="config">
+      <label>Custom timeouts (ms):</label>
+      <input type="text" id="customTimeouts" value="20,30,50" placeholder="20,30,50">
+    </div>
+    
+    <button onclick="runTimeoutTest()">Run Timeout Test</button>
+    <button class="clear" onclick="clearTimeoutResults()">Clear Results</button>
+    
+    <div id="timeoutResults" class="results" style="margin-top: 15px;">
+      <em>Click "Run Timeout Test" to start...</em>
+    </div>
+  </div>
+
+  <!-- Synthetic Watch Test Section -->
+  <div class="section">
+    <h2>🔄 Synthetic Watch vs Native Watch Test</h2>
+    <p>Compares native <code>watchPosition</code> (browser-controlled timing) with synthetic watch (<code>getCurrentPosition</code> at fixed intervals).</p>
+    
+    <div class="config">
+      <label>Watch Duration (seconds):</label>
+      <input type="number" id="watchDuration" value="30" min="5" max="300">
+    </div>
+    <div class="config">
+      <label>Synthetic Interval (ms):</label>
+      <input type="number" id="syntheticInterval" value="3000" min="500" max="30000">
+    </div>
+    <div class="config">
+      <label>Enable High Accuracy:</label>
+      <input type="checkbox" id="highAccuracy" checked>
+    </div>
+    
+    <button onclick="startWatchTest()">Start Watch Test</button>
+    <button class="stop" onclick="stopWatchTest()">Stop</button>
+    <button class="clear" onclick="clearWatchResults()">Clear Results</button>
+    
+    <span id="watchStatus" class="status idle" style="margin-left: 15px;">Idle</span>
+    
+    <div class="metrics">
+      <div class="metric">
+        <div class="metric-value" id="nativeCount">0</div>
+        <div class="metric-label">Native Callbacks</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="syntheticCount">0</div>
+        <div class="metric-label">Synthetic Callbacks</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="avgNativeAccuracy">-</div>
+        <div class="metric-label">Avg Native Accuracy (m)</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="avgSyntheticAccuracy">-</div>
+        <div class="metric-label">Avg Synthetic Accuracy (m)</div>
+      </div>
+    </div>
+    
+    <div id="watchResults" class="results" style="margin-top: 15px;">
+      <em>Click "Start Watch Test" to begin...</em>
+    </div>
+  </div>
+
+  <!-- Single Location Test -->
+  <div class="section">
+    <h2>📍 Single Location Test</h2>
+    <p>Get a single location reading with configurable options.</p>
+    
+    <div class="config">
+      <label>Timeout (ms):</label>
+      <input type="number" id="singleTimeout" value="20000" min="100" max="60000">
+    </div>
+    <div class="config">
+      <label>Maximum Age (ms):</label>
+      <input type="number" id="singleMaxAge" value="0" min="0" max="600000">
+    </div>
+    
+    <button onclick="getSingleLocation()">Get Location</button>
+    <button class="clear" onclick="clearSingleResults()">Clear</button>
+    
+    <div id="singleResults" class="results" style="margin-top: 15px;">
+      <em>Click "Get Location" to fetch current position...</em>
+    </div>
+  </div>
+
+  <!-- Export Section -->
+  <div class="section">
+    <h2>📊 Export Test Data</h2>
+    <button onclick="exportResults()">Export All Results (JSON)</button>
+    <button onclick="exportCSV()">Export as CSV</button>
+  </div>
+
+  <script>
+    // ==================== STATE ====================
+    let testData = {
+      timeoutTests: [],
+      watchTests: [],
+      singleTests: []
+    };
+    
+    let watchState = {
+      nativeWatchID: null,
+      syntheticIntervalID: null,
+      durationTimeoutID: null,
+      startTime: null,
+      nativeResults: [],
+      syntheticResults: []
+    };
+
+    // ==================== QUICK TIMEOUT TEST ====================
+    function runTimeoutTest() {
+      const timeoutsInput = document.getElementById('customTimeouts').value;
+      const timeouts = timeoutsInput.split(',').map(t => parseInt(t.trim())).filter(t => !isNaN(t));
+      
+      if (timeouts.length === 0) {
+        alert('Please enter valid timeout values');
+        return;
+      }
+      
+      const resultsDiv = document.getElementById('timeoutResults');
+      const testStartTime = Date.now();
+      const testId = `TT-${testStartTime}`;
+      
+      resultsDiv.innerHTML = `<div class="result-item timeout-test">
+        <span class="label timeout">TEST STARTED</span>
+        Testing timeouts: ${timeouts.join('ms, ')}ms
+        <div class="timestamp">${new Date().toISOString()}</div>
+      </div>`;
+      
+      const results = {};
+      let completed = 0;
+      
+      timeouts.forEach(timeout => {
+        const start = Date.now();
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const elapsed = Date.now() - start;
+            results[`tt_${timeout}`] = {
+              status: 'SUCCESS',
+              elapsed: elapsed,
+              accuracy: position.coords.accuracy,
+              timestamp: position.timestamp
+            };
+            completed++;
+            if (completed === timeouts.length) {
+              displayTimeoutResults(results, testId, testStartTime);
+            }
+          },
+          (error) => {
+            const elapsed = Date.now() - start;
+            results[`tt_${timeout}`] = {
+              status: 'FAIL',
+              elapsed: elapsed,
+              errorCode: error.code,
+              errorMessage: error.message
+            };
+            completed++;
+            if (completed === timeouts.length) {
+              displayTimeoutResults(results, testId, testStartTime);
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: timeout
+          }
+        );
+      });
+    }
+    
+    function displayTimeoutResults(results, testId, startTime) {
+      const resultsDiv = document.getElementById('timeoutResults');
+      const totalTime = Date.now() - startTime;
+      
+      let html = `<div class="result-item timeout-test">
+        <span class="label timeout">TEST COMPLETE</span>
+        Total time: ${totalTime}ms
+        <div class="timestamp">${new Date().toISOString()}</div>
+      </div>`;
+      
+      // Analysis
+      const successes = Object.values(results).filter(r => r.status === 'SUCCESS');
+      const isSuspicious = successes.length > 0;
+      
+      html += `<div class="result-item ${isSuspicious ? 'error' : 'success'}">
+        <strong>${isSuspicious ? '⚠️ SUSPICIOUS: ' + successes.length + ' instant response(s) detected!' : '✅ NORMAL: All requests timed out as expected'}</strong>
+      </div>`;
+      
+      // Results table
+      html += `<table>
+        <tr><th>Timeout</th><th>Status</th><th>Elapsed</th><th>Details</th></tr>`;
+      
+      Object.entries(results).forEach(([key, value]) => {
+        const timeout = key.replace('tt_', '');
+        html += `<tr>
+          <td>${timeout}ms</td>
+          <td>${value.status === 'SUCCESS' ? '🟢 SUCCESS' : '🔴 FAIL'}</td>
+          <td>${value.elapsed}ms</td>
+          <td>${value.status === 'SUCCESS' ? 
+            `Accuracy: ${value.accuracy?.toFixed(1)}m` : 
+            `Error ${value.errorCode}: ${value.errorMessage}`}</td>
+        </tr>`;
+      });
+      html += `</table>`;
+      
+      // Store for export
+      testData.timeoutTests.push({
+        id: testId,
+        timestamp: new Date().toISOString(),
+        results: results,
+        suspicious: isSuspicious
+      });
+      
+      resultsDiv.innerHTML = html + resultsDiv.innerHTML;
+    }
+    
+    function clearTimeoutResults() {
+      document.getElementById('timeoutResults').innerHTML = '<em>Click "Run Timeout Test" to start...</em>';
+      testData.timeoutTests = [];
+    }
+
+    // ==================== SYNTHETIC WATCH TEST ====================
+    function startWatchTest() {
+      if (watchState.nativeWatchID !== null) {
+        alert('Watch test already running. Stop it first.');
+        return;
+      }
+      
+      const duration = parseInt(document.getElementById('watchDuration').value) * 1000;
+      const syntheticInterval = parseInt(document.getElementById('syntheticInterval').value);
+      const highAccuracy = document.getElementById('highAccuracy').checked;
+      
+      watchState.startTime = Date.now();
+      watchState.nativeResults = [];
+      watchState.syntheticResults = [];
+      
+      const options = {
+        enableHighAccuracy: highAccuracy,
+        maximumAge: 0,
+        timeout: 20000
+      };
+      
+      const resultsDiv = document.getElementById('watchResults');
+      resultsDiv.innerHTML = '';
+      
+      document.getElementById('watchStatus').textContent = 'Running';
+      document.getElementById('watchStatus').className = 'status running';
+      
+      // Native watch
+      watchState.nativeWatchID = navigator.geolocation.watchPosition(
+        (position) => {
+          const elapsed = Date.now() - watchState.startTime;
+          const result = {
+            type: 'native',
+            elapsed: elapsed,
+            accuracy: position.coords.accuracy,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            timestamp: position.timestamp,
+            receivedAt: Date.now()
+          };
+          watchState.nativeResults.push(result);
+          addWatchResult(result);
+          updateWatchMetrics();
+        },
+        (error) => {
+          const elapsed = Date.now() - watchState.startTime;
+          const result = {
+            type: 'native',
+            elapsed: elapsed,
+            error: true,
+            errorCode: error.code,
+            errorMessage: error.message,
+            receivedAt: Date.now()
+          };
+          watchState.nativeResults.push(result);
+          addWatchResult(result);
+          updateWatchMetrics();
+        },
+        options
+      );
+      
+      // Synthetic watch - fire immediately
+      getSyntheticPosition(options);
+      
+      // Synthetic watch - interval
+      watchState.syntheticIntervalID = setInterval(() => {
+        getSyntheticPosition(options);
+      }, syntheticInterval);
+      
+      // Auto-stop after duration
+      watchState.durationTimeoutID = setTimeout(() => {
+        stopWatchTest();
+        addWatchResult({ type: 'system', message: `Test completed after ${duration/1000}s` });
+      }, duration);
+    }
+    
+    function getSyntheticPosition(options) {
+      const callTime = Date.now();
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const elapsed = Date.now() - watchState.startTime;
+          const result = {
+            type: 'synthetic',
+            elapsed: elapsed,
+            callToResponse: Date.now() - callTime,
+            accuracy: position.coords.accuracy,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            timestamp: position.timestamp,
+            receivedAt: Date.now()
+          };
+          watchState.syntheticResults.push(result);
+          addWatchResult(result);
+          updateWatchMetrics();
+        },
+        (error) => {
+          const elapsed = Date.now() - watchState.startTime;
+          const result = {
+            type: 'synthetic',
+            elapsed: elapsed,
+            callToResponse: Date.now() - callTime,
+            error: true,
+            errorCode: error.code,
+            errorMessage: error.message,
+            receivedAt: Date.now()
+          };
+          watchState.syntheticResults.push(result);
+          addWatchResult(result);
+          updateWatchMetrics();
+        },
+        options
+      );
+    }
+    
+    function addWatchResult(result) {
+      const resultsDiv = document.getElementById('watchResults');
+      let className = 'result-item';
+      let label = '';
+      let content = '';
+      
+      if (result.type === 'system') {
+        className += ' timeout-test';
+        label = '<span class="label timeout">SYSTEM</span>';
+        content = result.message;
+      } else if (result.error) {
+        className += ' error';
+        label = `<span class="label ${result.type}">${result.type.toUpperCase()}</span><span class="label error">ERROR</span>`;
+        content = `Error ${result.errorCode}: ${result.errorMessage}`;
+      } else {
+        className += result.type === 'synthetic' ? ' synthetic' : ' success';
+        label = `<span class="label ${result.type}">${result.type.toUpperCase()}</span>`;
+        content = `Accuracy: ${result.accuracy?.toFixed(1)}m | Lat: ${result.latitude?.toFixed(6)} | Lng: ${result.longitude?.toFixed(6)}`;
+        if (result.callToResponse) {
+          content += ` | Response: ${result.callToResponse}ms`;
+        }
+      }
+      
+      const html = `<div class="${className}">
+        ${label} @ ${result.elapsed || 0}ms
+        <div>${content}</div>
+        <div class="timestamp">${new Date().toISOString()}</div>
+      </div>`;
+      
+      resultsDiv.innerHTML = html + resultsDiv.innerHTML;
+    }
+    
+    function updateWatchMetrics() {
+      document.getElementById('nativeCount').textContent = watchState.nativeResults.length;
+      document.getElementById('syntheticCount').textContent = watchState.syntheticResults.length;
+      
+      const nativeAccuracies = watchState.nativeResults.filter(r => !r.error).map(r => r.accuracy);
+      const syntheticAccuracies = watchState.syntheticResults.filter(r => !r.error).map(r => r.accuracy);
+      
+      if (nativeAccuracies.length > 0) {
+        const avg = nativeAccuracies.reduce((a, b) => a + b, 0) / nativeAccuracies.length;
+        document.getElementById('avgNativeAccuracy').textContent = avg.toFixed(1);
+      }
+      
+      if (syntheticAccuracies.length > 0) {
+        const avg = syntheticAccuracies.reduce((a, b) => a + b, 0) / syntheticAccuracies.length;
+        document.getElementById('avgSyntheticAccuracy').textContent = avg.toFixed(1);
+      }
+    }
+    
+    function stopWatchTest() {
+      if (watchState.nativeWatchID !== null) {
+        navigator.geolocation.clearWatch(watchState.nativeWatchID);
+        watchState.nativeWatchID = null;
+      }
+      if (watchState.syntheticIntervalID !== null) {
+        clearInterval(watchState.syntheticIntervalID);
+        watchState.syntheticIntervalID = null;
+      }
+      if (watchState.durationTimeoutID !== null) {
+        clearTimeout(watchState.durationTimeoutID);
+        watchState.durationTimeoutID = null;
+      }
+      
+      document.getElementById('watchStatus').textContent = 'Stopped';
+      document.getElementById('watchStatus').className = 'status stopped';
+      
+      // Store results for export
+      if (watchState.nativeResults.length > 0 || watchState.syntheticResults.length > 0) {
+        testData.watchTests.push({
+          timestamp: new Date().toISOString(),
+          duration: Date.now() - watchState.startTime,
+          nativeResults: [...watchState.nativeResults],
+          syntheticResults: [...watchState.syntheticResults]
+        });
+      }
+    }
+    
+    function clearWatchResults() {
+      stopWatchTest();
+      document.getElementById('watchResults').innerHTML = '<em>Click "Start Watch Test" to begin...</em>';
+      document.getElementById('nativeCount').textContent = '0';
+      document.getElementById('syntheticCount').textContent = '0';
+      document.getElementById('avgNativeAccuracy').textContent = '-';
+      document.getElementById('avgSyntheticAccuracy').textContent = '-';
+      document.getElementById('watchStatus').textContent = 'Idle';
+      document.getElementById('watchStatus').className = 'status idle';
+      watchState.nativeResults = [];
+      watchState.syntheticResults = [];
+    }
+
+    // ==================== SINGLE LOCATION TEST ====================
+    function getSingleLocation() {
+      const timeout = parseInt(document.getElementById('singleTimeout').value);
+      const maxAge = parseInt(document.getElementById('singleMaxAge').value);
+      const resultsDiv = document.getElementById('singleResults');
+      
+      const startTime = Date.now();
+      
+      resultsDiv.innerHTML = `<div class="result-item">
+        <span class="label native">REQUESTING</span>
+        Timeout: ${timeout}ms, MaxAge: ${maxAge}ms
+        <div class="timestamp">${new Date().toISOString()}</div>
+      </div>` + resultsDiv.innerHTML;
+      
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const elapsed = Date.now() - startTime;
+          const result = {
+            elapsed: elapsed,
+            accuracy: position.coords.accuracy,
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            altitude: position.coords.altitude,
+            speed: position.coords.speed,
+            heading: position.coords.heading,
+            timestamp: position.timestamp
+          };
+          
+          testData.singleTests.push({
+            timestamp: new Date().toISOString(),
+            ...result
+          });
+          
+          resultsDiv.innerHTML = `<div class="result-item success">
+            <span class="label native">SUCCESS</span> in ${elapsed}ms
+            <div>
+              <strong>Accuracy:</strong> ${result.accuracy?.toFixed(1)}m<br>
+              <strong>Position:</strong> ${result.latitude?.toFixed(6)}, ${result.longitude?.toFixed(6)}<br>
+              <strong>Altitude:</strong> ${result.altitude || 'N/A'}<br>
+              <strong>Speed:</strong> ${result.speed || 'N/A'}<br>
+              <strong>Heading:</strong> ${result.heading || 'N/A'}
+            </div>
+            <div class="timestamp">${new Date().toISOString()}</div>
+          </div>` + resultsDiv.innerHTML;
+        },
+        (error) => {
+          const elapsed = Date.now() - startTime;
+          
+          testData.singleTests.push({
+            timestamp: new Date().toISOString(),
+            elapsed: elapsed,
+            error: true,
+            errorCode: error.code,
+            errorMessage: error.message
+          });
+          
+          resultsDiv.innerHTML = `<div class="result-item error">
+            <span class="label error">ERROR</span> after ${elapsed}ms
+            <div>Code ${error.code}: ${error.message}</div>
+            <div class="timestamp">${new Date().toISOString()}</div>
+          </div>` + resultsDiv.innerHTML;
+        },
+        {
+          enableHighAccuracy: document.getElementById('highAccuracy').checked,
+          maximumAge: maxAge,
+          timeout: timeout
+        }
+      );
+    }
+    
+    function clearSingleResults() {
+      document.getElementById('singleResults').innerHTML = '<em>Click "Get Location" to fetch current position...</em>';
+      testData.singleTests = [];
+    }
+
+    // ==================== EXPORT ====================
+    function exportResults() {
+      const data = {
+        exportedAt: new Date().toISOString(),
+        userAgent: navigator.userAgent,
+        ...testData
+      };
+      
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `geolocation-test-${Date.now()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+    
+    function exportCSV() {
+      let csv = 'Test Type,Timestamp,Elapsed (ms),Status,Accuracy (m),Latitude,Longitude,Error Code,Error Message\n';
+      
+      testData.timeoutTests.forEach(test => {
+        Object.entries(test.results).forEach(([key, value]) => {
+          csv += `Timeout ${key},${test.timestamp},${value.elapsed},${value.status},${value.accuracy || ''},${value.latitude || ''},${value.longitude || ''},${value.errorCode || ''},${value.errorMessage || ''}\n`;
+        });
+      });
+      
+      testData.watchTests.forEach(test => {
+        test.nativeResults.forEach(r => {
+          csv += `Native Watch,${test.timestamp},${r.elapsed},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
+        });
+        test.syntheticResults.forEach(r => {
+          csv += `Synthetic Watch,${test.timestamp},${r.elapsed},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
+        });
+      });
+      
+      testData.singleTests.forEach(r => {
+        csv += `Single,${r.timestamp},${r.elapsed},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
+      });
+      
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `geolocation-test-${Date.now()}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
