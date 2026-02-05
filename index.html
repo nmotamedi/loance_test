@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Geolocation Test Harness</title>
+  <title>Geolocation Test Harness v2</title>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -37,9 +37,11 @@
     button.stop { background: #dc3545; }
     button.stop:hover { background: #c82333; }
     button.clear { background: #6c757d; }
+    button.secondary { background: #28a745; }
+    button.secondary:hover { background: #218838; }
     .config { margin-bottom: 15px; }
     .config label { display: inline-block; width: 180px; }
-    .config input { width: 100px; padding: 5px; }
+    .config input, .config select { width: 120px; padding: 5px; }
     .results { 
       background: #f8f9fa; 
       border: 1px solid #ddd; 
@@ -60,7 +62,10 @@
     .result-item.error { border-left-color: #dc3545; }
     .result-item.success { border-left-color: #28a745; }
     .result-item.synthetic { border-left-color: #ffc107; }
+    .result-item.native { border-left-color: #007bff; }
     .result-item.timeout-test { border-left-color: #17a2b8; }
+    .result-item.cache { border-left-color: #6f42c1; }
+    .result-item.warning { border-left-color: #fd7e14; background: #fff3cd; }
     .timestamp { color: #666; font-size: 11px; }
     .label { 
       display: inline-block; 
@@ -74,9 +79,11 @@
     .label.synthetic { background: #ffc107; color: black; }
     .label.timeout { background: #17a2b8; color: white; }
     .label.error { background: #dc3545; color: white; }
+    .label.cache { background: #6f42c1; color: white; }
+    .label.warning { background: #fd7e14; color: white; }
     .metrics { 
       display: grid; 
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); 
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
       gap: 15px; 
       margin-top: 15px;
     }
@@ -95,22 +102,57 @@
     .status.running { background: #d4edda; color: #155724; }
     .status.stopped { background: #f8d7da; color: #721c24; }
     .status.idle { background: #e2e3e5; color: #383d41; }
+    .mode-selector { 
+      display: flex; 
+      gap: 10px; 
+      margin-bottom: 15px; 
+      padding: 10px; 
+      background: #e9ecef; 
+      border-radius: 4px;
+    }
+    .mode-selector label { 
+      display: flex; 
+      align-items: center; 
+      gap: 5px;
+      cursor: pointer;
+    }
+    .info-box {
+      background: #d1ecf1;
+      border: 1px solid #bee5eb;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+    .warning-box {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
-  <h1>🌍 Geolocation Test Harness</h1>
+  <h1>🌍 Geolocation Test Harness v2</h1>
   
   <!-- Quick Timeout Test Section -->
   <div class="section">
-    <h2>⚡ Quick Timeout Spoof Detection Test</h2>
-    <p>Tests if location can be obtained with very short timeouts (20ms, 30ms, 50ms). Real GPS/WiFi should <strong>fail</strong>; spoofed locations may <strong>succeed</strong>.</p>
+    <h2>⚡ Quick Timeout Spoof Detection Test (with Cache Detection)</h2>
+    <p>Tests if location can be obtained with very short timeouts. Includes cache detection to avoid false positives.</p>
+    
+    <div class="info-box">
+      <strong>How it works:</strong> First detects if cached location exists, then runs timeout tests. 
+      If cache is fresh (&lt;5s old), fast responses are expected and NOT suspicious.
+    </div>
     
     <div class="config">
       <label>Custom timeouts (ms):</label>
       <input type="text" id="customTimeouts" value="20,30,50" placeholder="20,30,50">
     </div>
     
-    <button onclick="runTimeoutTest()">Run Timeout Test</button>
+    <button onclick="runTimeoutTestWithCacheCheck()">Run Timeout Test</button>
     <button class="clear" onclick="clearTimeoutResults()">Clear Results</button>
     
     <div id="timeoutResults" class="results" style="margin-top: 15px;">
@@ -118,16 +160,33 @@
     </div>
   </div>
 
-  <!-- Synthetic Watch Test Section -->
+  <!-- Watch Test Section - Now with Mode Selection -->
   <div class="section">
-    <h2>🔄 Synthetic Watch vs Native Watch Test</h2>
-    <p>Compares native <code>watchPosition</code> (browser-controlled timing) with synthetic watch (<code>getCurrentPosition</code> at fixed intervals).</p>
+    <h2>🔄 Watch Position Test</h2>
+    <p>Test native watchPosition OR synthetic polling independently for clean data.</p>
+    
+    <div class="warning-box">
+      <strong>⚠️ Important:</strong> Run native and synthetic tests SEPARATELY to avoid resource contention 
+      and get accurate independent measurements.
+    </div>
+    
+    <div class="mode-selector">
+      <strong>Mode:</strong>
+      <label>
+        <input type="radio" name="watchMode" value="native" checked>
+        Native Watch (browser-controlled timing)
+      </label>
+      <label>
+        <input type="radio" name="watchMode" value="synthetic">
+        Synthetic Watch (fixed interval polling)
+      </label>
+    </div>
     
     <div class="config">
       <label>Watch Duration (seconds):</label>
       <input type="number" id="watchDuration" value="30" min="5" max="300">
     </div>
-    <div class="config">
+    <div class="config" id="syntheticIntervalConfig">
       <label>Synthetic Interval (ms):</label>
       <input type="number" id="syntheticInterval" value="3000" min="500" max="30000">
     </div>
@@ -135,34 +194,48 @@
       <label>Enable High Accuracy:</label>
       <input type="checkbox" id="highAccuracy" checked>
     </div>
+    <div class="config">
+      <label>Request Timeout (ms):</label>
+      <input type="number" id="requestTimeout" value="10000" min="1000" max="60000">
+      <span style="font-size: 12px; color: #666;"> (for synthetic getCurrentPosition calls)</span>
+    </div>
     
-    <button onclick="startWatchTest()">Start Watch Test</button>
+    <button onclick="startWatchTest()">Start Test</button>
     <button class="stop" onclick="stopWatchTest()">Stop</button>
     <button class="clear" onclick="clearWatchResults()">Clear Results</button>
     
     <span id="watchStatus" class="status idle" style="margin-left: 15px;">Idle</span>
+    <span id="watchMode" style="margin-left: 10px; font-weight: bold;"></span>
     
     <div class="metrics">
       <div class="metric">
-        <div class="metric-value" id="nativeCount">0</div>
-        <div class="metric-label">Native Callbacks</div>
+        <div class="metric-value" id="callbackCount">0</div>
+        <div class="metric-label">Callbacks</div>
       </div>
       <div class="metric">
-        <div class="metric-value" id="syntheticCount">0</div>
-        <div class="metric-label">Synthetic Callbacks</div>
+        <div class="metric-value" id="errorCount">0</div>
+        <div class="metric-label">Errors</div>
       </div>
       <div class="metric">
-        <div class="metric-value" id="avgNativeAccuracy">-</div>
-        <div class="metric-label">Avg Native Accuracy (m)</div>
+        <div class="metric-value" id="avgAccuracy">-</div>
+        <div class="metric-label">Avg Accuracy (m)</div>
       </div>
       <div class="metric">
-        <div class="metric-value" id="avgSyntheticAccuracy">-</div>
-        <div class="metric-label">Avg Synthetic Accuracy (m)</div>
+        <div class="metric-value" id="minAccuracy">-</div>
+        <div class="metric-label">Best Accuracy (m)</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="maxAccuracy">-</div>
+        <div class="metric-label">Worst Accuracy (m)</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="uniquePositions">0</div>
+        <div class="metric-label">Unique Positions</div>
       </div>
     </div>
     
     <div id="watchResults" class="results" style="margin-top: 15px;">
-      <em>Click "Start Watch Test" to begin...</em>
+      <em>Select a mode and click "Start Test" to begin...</em>
     </div>
   </div>
 
@@ -199,21 +272,31 @@
     // ==================== STATE ====================
     let testData = {
       timeoutTests: [],
-      watchTests: [],
+      nativeWatchTests: [],
+      syntheticWatchTests: [],
       singleTests: []
     };
     
     let watchState = {
-      nativeWatchID: null,
-      syntheticIntervalID: null,
+      watchID: null,
+      intervalID: null,
       durationTimeoutID: null,
       startTime: null,
-      nativeResults: [],
-      syntheticResults: []
+      mode: null,
+      results: [],
+      positionTimestamps: new Set() // Track unique positions
     };
 
-    // ==================== QUICK TIMEOUT TEST ====================
-    function runTimeoutTest() {
+    // Update UI based on mode selection
+    document.querySelectorAll('input[name="watchMode"]').forEach(radio => {
+      radio.addEventListener('change', (e) => {
+        const intervalConfig = document.getElementById('syntheticIntervalConfig');
+        intervalConfig.style.display = e.target.value === 'synthetic' ? 'block' : 'none';
+      });
+    });
+
+    // ==================== QUICK TIMEOUT TEST WITH CACHE DETECTION ====================
+    function runTimeoutTestWithCacheCheck() {
       const timeoutsInput = document.getElementById('customTimeouts').value;
       const timeouts = timeoutsInput.split(',').map(t => parseInt(t.trim())).filter(t => !isNaN(t));
       
@@ -227,12 +310,77 @@
       const testId = `TT-${testStartTime}`;
       
       resultsDiv.innerHTML = `<div class="result-item timeout-test">
-        <span class="label timeout">TEST STARTED</span>
-        Testing timeouts: ${timeouts.join('ms, ')}ms
+        <span class="label timeout">PHASE 1</span>
+        Checking for cached location...
         <div class="timestamp">${new Date().toISOString()}</div>
       </div>`;
       
-      const results = {};
+      // Phase 1: Cache Detection
+      const cacheCheckStart = Date.now();
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const cacheCheckElapsed = Date.now() - cacheCheckStart;
+          const positionAge = Date.now() - position.timestamp;
+          const cacheInfo = {
+            detected: true,
+            elapsed: cacheCheckElapsed,
+            positionAge: positionAge,
+            accuracy: position.coords.accuracy,
+            timestamp: position.timestamp
+          };
+          
+          resultsDiv.innerHTML = `<div class="result-item cache">
+            <span class="label cache">CACHE DETECTED</span>
+            Position age: ${positionAge}ms | Check took: ${cacheCheckElapsed}ms | Accuracy: ${position.coords.accuracy.toFixed(1)}m
+            <div class="timestamp">${new Date().toISOString()}</div>
+          </div>` + resultsDiv.innerHTML;
+          
+          // Warn if cache is fresh
+          if (positionAge < 5000) {
+            resultsDiv.innerHTML = `<div class="result-item warning">
+              <span class="label warning">WARNING</span>
+              Fresh cache detected (${positionAge}ms old). Fast timeout responses may be from cache, not spoofing.
+              <div class="timestamp">${new Date().toISOString()}</div>
+            </div>` + resultsDiv.innerHTML;
+          }
+          
+          // Phase 2: Run actual timeout tests
+          runActualTimeoutTests(timeouts, cacheInfo, testId, testStartTime, resultsDiv);
+        },
+        (error) => {
+          const cacheCheckElapsed = Date.now() - cacheCheckStart;
+          const cacheInfo = {
+            detected: false,
+            elapsed: cacheCheckElapsed,
+            errorCode: error.code,
+            errorMessage: error.message
+          };
+          
+          resultsDiv.innerHTML = `<div class="result-item success">
+            <span class="label cache">NO CACHE</span>
+            No cached position available (Error ${error.code}: ${error.message})
+            <div class="timestamp">${new Date().toISOString()}</div>
+          </div>` + resultsDiv.innerHTML;
+          
+          // Phase 2: Run actual timeout tests
+          runActualTimeoutTests(timeouts, cacheInfo, testId, testStartTime, resultsDiv);
+        },
+        {
+          enableHighAccuracy: false,
+          maximumAge: Infinity, // Accept any cached position
+          timeout: 100
+        }
+      );
+    }
+    
+    function runActualTimeoutTests(timeouts, cacheInfo, testId, testStartTime, resultsDiv) {
+      resultsDiv.innerHTML = `<div class="result-item timeout-test">
+        <span class="label timeout">PHASE 2</span>
+        Running timeout tests: ${timeouts.join('ms, ')}ms
+        <div class="timestamp">${new Date().toISOString()}</div>
+      </div>` + resultsDiv.innerHTML;
+      
+      const results = { cacheInfo: cacheInfo };
       let completed = 0;
       
       timeouts.forEach(timeout => {
@@ -241,15 +389,18 @@
         navigator.geolocation.getCurrentPosition(
           (position) => {
             const elapsed = Date.now() - start;
+            const positionAge = Date.now() - position.timestamp;
             results[`tt_${timeout}`] = {
               status: 'SUCCESS',
               elapsed: elapsed,
+              positionAge: positionAge,
               accuracy: position.coords.accuracy,
-              timestamp: position.timestamp
+              timestamp: position.timestamp,
+              isCachedResponse: position.timestamp === cacheInfo.timestamp
             };
             completed++;
             if (completed === timeouts.length) {
-              displayTimeoutResults(results, testId, testStartTime);
+              displayTimeoutResults(results, testId, testStartTime, resultsDiv);
             }
           },
           (error) => {
@@ -262,7 +413,7 @@
             };
             completed++;
             if (completed === timeouts.length) {
-              displayTimeoutResults(results, testId, testStartTime);
+              displayTimeoutResults(results, testId, testStartTime, resultsDiv);
             }
           },
           {
@@ -274,37 +425,64 @@
       });
     }
     
-    function displayTimeoutResults(results, testId, startTime) {
-      const resultsDiv = document.getElementById('timeoutResults');
+    function displayTimeoutResults(results, testId, startTime, resultsDiv) {
       const totalTime = Date.now() - startTime;
+      const cacheInfo = results.cacheInfo;
+      
+      // Analyze results
+      const timeoutResults = Object.entries(results).filter(([k]) => k.startsWith('tt_'));
+      const successes = timeoutResults.filter(([k, v]) => v.status === 'SUCCESS');
+      const cachedSuccesses = successes.filter(([k, v]) => v.isCachedResponse);
+      const freshSuccesses = successes.filter(([k, v]) => !v.isCachedResponse);
+      
+      // Determine if suspicious
+      let isSuspicious = false;
+      let suspicionReason = '';
+      
+      if (freshSuccesses.length > 0) {
+        isSuspicious = true;
+        suspicionReason = `${freshSuccesses.length} instant response(s) with FRESH position data`;
+      } else if (successes.length > 0 && cacheInfo.detected && cacheInfo.positionAge > 5000) {
+        isSuspicious = true;
+        suspicionReason = `${successes.length} instant response(s) despite stale cache (${cacheInfo.positionAge}ms old)`;
+      }
       
       let html = `<div class="result-item timeout-test">
-        <span class="label timeout">TEST COMPLETE</span>
+        <span class="label timeout">COMPLETE</span>
         Total time: ${totalTime}ms
         <div class="timestamp">${new Date().toISOString()}</div>
       </div>`;
       
-      // Analysis
-      const successes = Object.values(results).filter(r => r.status === 'SUCCESS');
-      const isSuspicious = successes.length > 0;
-      
-      html += `<div class="result-item ${isSuspicious ? 'error' : 'success'}">
-        <strong>${isSuspicious ? '⚠️ SUSPICIOUS: ' + successes.length + ' instant response(s) detected!' : '✅ NORMAL: All requests timed out as expected'}</strong>
-      </div>`;
+      // Verdict
+      if (isSuspicious) {
+        html += `<div class="result-item error">
+          <strong>⚠️ SUSPICIOUS:</strong> ${suspicionReason}
+        </div>`;
+      } else if (successes.length > 0 && cachedSuccesses.length === successes.length) {
+        html += `<div class="result-item warning">
+          <strong>ℹ️ CACHED:</strong> ${successes.length} success(es) from cached position - NOT suspicious
+        </div>`;
+      } else {
+        html += `<div class="result-item success">
+          <strong>✅ NORMAL:</strong> All requests timed out as expected for real location
+        </div>`;
+      }
       
       // Results table
       html += `<table>
-        <tr><th>Timeout</th><th>Status</th><th>Elapsed</th><th>Details</th></tr>`;
+        <tr><th>Timeout</th><th>Status</th><th>Elapsed</th><th>Position Age</th><th>From Cache?</th><th>Details</th></tr>`;
       
-      Object.entries(results).forEach(([key, value]) => {
+      timeoutResults.forEach(([key, value]) => {
         const timeout = key.replace('tt_', '');
         html += `<tr>
           <td>${timeout}ms</td>
           <td>${value.status === 'SUCCESS' ? '🟢 SUCCESS' : '🔴 FAIL'}</td>
           <td>${value.elapsed}ms</td>
+          <td>${value.positionAge ? value.positionAge + 'ms' : '-'}</td>
+          <td>${value.isCachedResponse ? '✓ Yes' : value.status === 'SUCCESS' ? '✗ No (Fresh!)' : '-'}</td>
           <td>${value.status === 'SUCCESS' ? 
             `Accuracy: ${value.accuracy?.toFixed(1)}m` : 
-            `Error ${value.errorCode}: ${value.errorMessage}`}</td>
+            `Error ${value.errorCode}`}</td>
         </tr>`;
       });
       html += `</table>`;
@@ -313,8 +491,10 @@
       testData.timeoutTests.push({
         id: testId,
         timestamp: new Date().toISOString(),
+        cacheInfo: cacheInfo,
         results: results,
-        suspicious: isSuspicious
+        suspicious: isSuspicious,
+        suspicionReason: suspicionReason
       });
       
       resultsDiv.innerHTML = html + resultsDiv.innerHTML;
@@ -325,121 +505,132 @@
       testData.timeoutTests = [];
     }
 
-    // ==================== SYNTHETIC WATCH TEST ====================
+    // ==================== WATCH TEST (NATIVE OR SYNTHETIC) ====================
     function startWatchTest() {
-      if (watchState.nativeWatchID !== null) {
-        alert('Watch test already running. Stop it first.');
+      if (watchState.watchID !== null || watchState.intervalID !== null) {
+        alert('Test already running. Stop it first.');
         return;
       }
       
+      const mode = document.querySelector('input[name="watchMode"]:checked').value;
       const duration = parseInt(document.getElementById('watchDuration').value) * 1000;
       const syntheticInterval = parseInt(document.getElementById('syntheticInterval').value);
       const highAccuracy = document.getElementById('highAccuracy').checked;
+      const requestTimeout = parseInt(document.getElementById('requestTimeout').value);
       
       watchState.startTime = Date.now();
-      watchState.nativeResults = [];
-      watchState.syntheticResults = [];
-      
-      const options = {
-        enableHighAccuracy: highAccuracy,
-        maximumAge: 0,
-        timeout: 20000
-      };
+      watchState.mode = mode;
+      watchState.results = [];
+      watchState.positionTimestamps = new Set();
       
       const resultsDiv = document.getElementById('watchResults');
       resultsDiv.innerHTML = '';
       
       document.getElementById('watchStatus').textContent = 'Running';
       document.getElementById('watchStatus').className = 'status running';
+      document.getElementById('watchMode').textContent = `[${mode.toUpperCase()} MODE]`;
       
-      // Native watch
-      watchState.nativeWatchID = navigator.geolocation.watchPosition(
-        (position) => {
-          const elapsed = Date.now() - watchState.startTime;
-          const result = {
-            type: 'native',
-            elapsed: elapsed,
-            accuracy: position.coords.accuracy,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            timestamp: position.timestamp,
-            receivedAt: Date.now()
-          };
-          watchState.nativeResults.push(result);
-          addWatchResult(result);
-          updateWatchMetrics();
-        },
-        (error) => {
-          const elapsed = Date.now() - watchState.startTime;
-          const result = {
-            type: 'native',
-            elapsed: elapsed,
-            error: true,
-            errorCode: error.code,
-            errorMessage: error.message,
-            receivedAt: Date.now()
-          };
-          watchState.nativeResults.push(result);
-          addWatchResult(result);
-          updateWatchMetrics();
-        },
+      // Reset metrics
+      updateWatchMetrics();
+      
+      if (mode === 'native') {
+        startNativeWatch(highAccuracy, requestTimeout, duration);
+      } else {
+        startSyntheticWatch(highAccuracy, requestTimeout, syntheticInterval, duration);
+      }
+    }
+    
+    function startNativeWatch(highAccuracy, timeout, duration) {
+      const options = {
+        enableHighAccuracy: highAccuracy,
+        maximumAge: 0,
+        timeout: timeout
+      };
+      
+      watchState.watchID = navigator.geolocation.watchPosition(
+        (position) => handleWatchResult(position, 'native'),
+        (error) => handleWatchError(error, 'native'),
         options
       );
-      
-      // Synthetic watch - fire immediately
-      getSyntheticPosition(options);
-      
-      // Synthetic watch - interval
-      watchState.syntheticIntervalID = setInterval(() => {
-        getSyntheticPosition(options);
-      }, syntheticInterval);
       
       // Auto-stop after duration
       watchState.durationTimeoutID = setTimeout(() => {
         stopWatchTest();
-        addWatchResult({ type: 'system', message: `Test completed after ${duration/1000}s` });
+        addWatchResultItem({ type: 'system', message: `Native watch completed after ${duration/1000}s` });
       }, duration);
     }
     
-    function getSyntheticPosition(options) {
-      const callTime = Date.now();
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const elapsed = Date.now() - watchState.startTime;
-          const result = {
-            type: 'synthetic',
-            elapsed: elapsed,
-            callToResponse: Date.now() - callTime,
-            accuracy: position.coords.accuracy,
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-            timestamp: position.timestamp,
-            receivedAt: Date.now()
-          };
-          watchState.syntheticResults.push(result);
-          addWatchResult(result);
-          updateWatchMetrics();
-        },
-        (error) => {
-          const elapsed = Date.now() - watchState.startTime;
-          const result = {
-            type: 'synthetic',
-            elapsed: elapsed,
-            callToResponse: Date.now() - callTime,
-            error: true,
-            errorCode: error.code,
-            errorMessage: error.message,
-            receivedAt: Date.now()
-          };
-          watchState.syntheticResults.push(result);
-          addWatchResult(result);
-          updateWatchMetrics();
-        },
-        options
-      );
+    function startSyntheticWatch(highAccuracy, timeout, interval, duration) {
+      const options = {
+        enableHighAccuracy: highAccuracy,
+        maximumAge: 0,
+        timeout: timeout
+      };
+      
+      // Track call times for accurate elapsed calculation
+      function makeSyntheticCall() {
+        const callTime = Date.now();
+        navigator.geolocation.getCurrentPosition(
+          (position) => handleWatchResult(position, 'synthetic', callTime),
+          (error) => handleWatchError(error, 'synthetic', callTime),
+          options
+        );
+      }
+      
+      // Fire immediately
+      makeSyntheticCall();
+      
+      // Then at intervals
+      watchState.intervalID = setInterval(makeSyntheticCall, interval);
+      
+      // Auto-stop after duration
+      watchState.durationTimeoutID = setTimeout(() => {
+        stopWatchTest();
+        addWatchResultItem({ type: 'system', message: `Synthetic watch completed after ${duration/1000}s` });
+      }, duration);
     }
     
-    function addWatchResult(result) {
+    function handleWatchResult(position, type, callTime = null) {
+      const elapsed = Date.now() - watchState.startTime;
+      const result = {
+        type: type,
+        elapsed: elapsed,
+        callToResponse: callTime ? Date.now() - callTime : null,
+        accuracy: position.coords.accuracy,
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        altitude: position.coords.altitude,
+        speed: position.coords.speed,
+        heading: position.coords.heading,
+        timestamp: position.timestamp,
+        receivedAt: Date.now(),
+        isNewPosition: !watchState.positionTimestamps.has(position.timestamp)
+      };
+      
+      watchState.positionTimestamps.add(position.timestamp);
+      watchState.results.push(result);
+      addWatchResultItem(result);
+      updateWatchMetrics();
+    }
+    
+    function handleWatchError(error, type, callTime = null) {
+      const elapsed = Date.now() - watchState.startTime;
+      const result = {
+        type: type,
+        elapsed: elapsed,
+        callToResponse: callTime ? Date.now() - callTime : null,
+        error: true,
+        errorCode: error.code,
+        errorMessage: error.message,
+        receivedAt: Date.now()
+      };
+      
+      watchState.results.push(result);
+      addWatchResultItem(result);
+      updateWatchMetrics();
+    }
+    
+    function addWatchResultItem(result) {
       const resultsDiv = document.getElementById('watchResults');
       let className = 'result-item';
       let label = '';
@@ -453,17 +644,24 @@
         className += ' error';
         label = `<span class="label ${result.type}">${result.type.toUpperCase()}</span><span class="label error">ERROR</span>`;
         content = `Error ${result.errorCode}: ${result.errorMessage}`;
+        if (result.callToResponse) {
+          content += ` | Response time: ${result.callToResponse}ms`;
+        }
       } else {
-        className += result.type === 'synthetic' ? ' synthetic' : ' success';
+        className += ` ${result.type}`;
         label = `<span class="label ${result.type}">${result.type.toUpperCase()}</span>`;
+        if (!result.isNewPosition) {
+          label += '<span class="label warning">DUPLICATE</span>';
+        }
         content = `Accuracy: ${result.accuracy?.toFixed(1)}m | Lat: ${result.latitude?.toFixed(6)} | Lng: ${result.longitude?.toFixed(6)}`;
         if (result.callToResponse) {
           content += ` | Response: ${result.callToResponse}ms`;
         }
+        content += ` | Position age: ${Date.now() - result.timestamp}ms`;
       }
       
       const html = `<div class="${className}">
-        ${label} @ ${result.elapsed || 0}ms
+        ${label} @ ${result.elapsed}ms
         <div>${content}</div>
         <div class="timestamp">${new Date().toISOString()}</div>
       </div>`;
@@ -472,31 +670,33 @@
     }
     
     function updateWatchMetrics() {
-      document.getElementById('nativeCount').textContent = watchState.nativeResults.length;
-      document.getElementById('syntheticCount').textContent = watchState.syntheticResults.length;
+      const successResults = watchState.results.filter(r => !r.error);
+      const errorResults = watchState.results.filter(r => r.error);
+      const accuracies = successResults.map(r => r.accuracy);
+      const uniqueCount = watchState.positionTimestamps.size;
       
-      const nativeAccuracies = watchState.nativeResults.filter(r => !r.error).map(r => r.accuracy);
-      const syntheticAccuracies = watchState.syntheticResults.filter(r => !r.error).map(r => r.accuracy);
+      document.getElementById('callbackCount').textContent = successResults.length;
+      document.getElementById('errorCount').textContent = errorResults.length;
+      document.getElementById('uniquePositions').textContent = uniqueCount;
       
-      if (nativeAccuracies.length > 0) {
-        const avg = nativeAccuracies.reduce((a, b) => a + b, 0) / nativeAccuracies.length;
-        document.getElementById('avgNativeAccuracy').textContent = avg.toFixed(1);
-      }
-      
-      if (syntheticAccuracies.length > 0) {
-        const avg = syntheticAccuracies.reduce((a, b) => a + b, 0) / syntheticAccuracies.length;
-        document.getElementById('avgSyntheticAccuracy').textContent = avg.toFixed(1);
+      if (accuracies.length > 0) {
+        const avg = accuracies.reduce((a, b) => a + b, 0) / accuracies.length;
+        const min = Math.min(...accuracies);
+        const max = Math.max(...accuracies);
+        document.getElementById('avgAccuracy').textContent = avg.toFixed(1);
+        document.getElementById('minAccuracy').textContent = min.toFixed(1);
+        document.getElementById('maxAccuracy').textContent = max.toFixed(1);
       }
     }
     
     function stopWatchTest() {
-      if (watchState.nativeWatchID !== null) {
-        navigator.geolocation.clearWatch(watchState.nativeWatchID);
-        watchState.nativeWatchID = null;
+      if (watchState.watchID !== null) {
+        navigator.geolocation.clearWatch(watchState.watchID);
+        watchState.watchID = null;
       }
-      if (watchState.syntheticIntervalID !== null) {
-        clearInterval(watchState.syntheticIntervalID);
-        watchState.syntheticIntervalID = null;
+      if (watchState.intervalID !== null) {
+        clearInterval(watchState.intervalID);
+        watchState.intervalID = null;
       }
       if (watchState.durationTimeoutID !== null) {
         clearTimeout(watchState.durationTimeoutID);
@@ -507,27 +707,55 @@
       document.getElementById('watchStatus').className = 'status stopped';
       
       // Store results for export
-      if (watchState.nativeResults.length > 0 || watchState.syntheticResults.length > 0) {
-        testData.watchTests.push({
+      if (watchState.results.length > 0) {
+        const testRecord = {
           timestamp: new Date().toISOString(),
+          mode: watchState.mode,
           duration: Date.now() - watchState.startTime,
-          nativeResults: [...watchState.nativeResults],
-          syntheticResults: [...watchState.syntheticResults]
-        });
+          results: [...watchState.results],
+          uniquePositions: watchState.positionTimestamps.size,
+          summary: calculateSummary(watchState.results)
+        };
+        
+        if (watchState.mode === 'native') {
+          testData.nativeWatchTests.push(testRecord);
+        } else {
+          testData.syntheticWatchTests.push(testRecord);
+        }
       }
+    }
+    
+    function calculateSummary(results) {
+      const successResults = results.filter(r => !r.error);
+      const accuracies = successResults.map(r => r.accuracy);
+      
+      if (accuracies.length === 0) {
+        return { callbacks: 0, errors: results.length };
+      }
+      
+      return {
+        callbacks: successResults.length,
+        errors: results.filter(r => r.error).length,
+        avgAccuracy: accuracies.reduce((a, b) => a + b, 0) / accuracies.length,
+        minAccuracy: Math.min(...accuracies),
+        maxAccuracy: Math.max(...accuracies)
+      };
     }
     
     function clearWatchResults() {
       stopWatchTest();
-      document.getElementById('watchResults').innerHTML = '<em>Click "Start Watch Test" to begin...</em>';
-      document.getElementById('nativeCount').textContent = '0';
-      document.getElementById('syntheticCount').textContent = '0';
-      document.getElementById('avgNativeAccuracy').textContent = '-';
-      document.getElementById('avgSyntheticAccuracy').textContent = '-';
+      document.getElementById('watchResults').innerHTML = '<em>Select a mode and click "Start Test" to begin...</em>';
+      document.getElementById('callbackCount').textContent = '0';
+      document.getElementById('errorCount').textContent = '0';
+      document.getElementById('avgAccuracy').textContent = '-';
+      document.getElementById('minAccuracy').textContent = '-';
+      document.getElementById('maxAccuracy').textContent = '-';
+      document.getElementById('uniquePositions').textContent = '0';
       document.getElementById('watchStatus').textContent = 'Idle';
       document.getElementById('watchStatus').className = 'status idle';
-      watchState.nativeResults = [];
-      watchState.syntheticResults = [];
+      document.getElementById('watchMode').textContent = '';
+      watchState.results = [];
+      watchState.positionTimestamps = new Set();
     }
 
     // ==================== SINGLE LOCATION TEST ====================
@@ -547,8 +775,10 @@
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const elapsed = Date.now() - startTime;
+          const positionAge = Date.now() - position.timestamp;
           const result = {
             elapsed: elapsed,
+            positionAge: positionAge,
             accuracy: position.coords.accuracy,
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
@@ -568,9 +798,10 @@
             <div>
               <strong>Accuracy:</strong> ${result.accuracy?.toFixed(1)}m<br>
               <strong>Position:</strong> ${result.latitude?.toFixed(6)}, ${result.longitude?.toFixed(6)}<br>
-              <strong>Altitude:</strong> ${result.altitude || 'N/A'}<br>
-              <strong>Speed:</strong> ${result.speed || 'N/A'}<br>
-              <strong>Heading:</strong> ${result.heading || 'N/A'}
+              <strong>Position Age:</strong> ${positionAge}ms<br>
+              <strong>Altitude:</strong> ${result.altitude?.toFixed(1) || 'N/A'}m<br>
+              <strong>Speed:</strong> ${result.speed?.toFixed(1) || 'N/A'} m/s<br>
+              <strong>Heading:</strong> ${result.heading?.toFixed(1) || 'N/A'}°
             </div>
             <div class="timestamp">${new Date().toISOString()}</div>
           </div>` + resultsDiv.innerHTML;
@@ -593,7 +824,7 @@
           </div>` + resultsDiv.innerHTML;
         },
         {
-          enableHighAccuracy: document.getElementById('highAccuracy').checked,
+          enableHighAccuracy: document.getElementById('highAccuracy')?.checked ?? true,
           maximumAge: maxAge,
           timeout: timeout
         }
@@ -617,41 +848,51 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `geolocation-test-${Date.now()}.json`;
+      a.download = `geolocation-test-v2-${Date.now()}.json`;
       a.click();
       URL.revokeObjectURL(url);
     }
     
     function exportCSV() {
-      let csv = 'Test Type,Timestamp,Elapsed (ms),Status,Accuracy (m),Latitude,Longitude,Error Code,Error Message\n';
+      let csv = 'Test Type,Mode,Timestamp,Elapsed (ms),Call-to-Response (ms),Status,Accuracy (m),Latitude,Longitude,Position Age (ms),Is New Position,Error Code,Error Message\n';
       
+      // Timeout tests
       testData.timeoutTests.forEach(test => {
-        Object.entries(test.results).forEach(([key, value]) => {
-          csv += `Timeout ${key},${test.timestamp},${value.elapsed},${value.status},${value.accuracy || ''},${value.latitude || ''},${value.longitude || ''},${value.errorCode || ''},${value.errorMessage || ''}\n`;
+        Object.entries(test.results).filter(([k]) => k.startsWith('tt_')).forEach(([key, value]) => {
+          csv += `Timeout ${key},timeout,${test.timestamp},${value.elapsed},,${value.status},${value.accuracy || ''},,,,${value.isCachedResponse ? 'No (cached)' : 'Yes'},${value.errorCode || ''},${value.errorMessage || ''}\n`;
         });
       });
       
-      testData.watchTests.forEach(test => {
-        test.nativeResults.forEach(r => {
-          csv += `Native Watch,${test.timestamp},${r.elapsed},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
-        });
-        test.syntheticResults.forEach(r => {
-          csv += `Synthetic Watch,${test.timestamp},${r.elapsed},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
+      // Native watch tests
+      testData.nativeWatchTests.forEach(test => {
+        test.results.forEach(r => {
+          csv += `Watch,native,${test.timestamp},${r.elapsed},${r.callToResponse || ''},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.timestamp ? Date.now() - r.timestamp : ''},${r.isNewPosition || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
         });
       });
       
+      // Synthetic watch tests
+      testData.syntheticWatchTests.forEach(test => {
+        test.results.forEach(r => {
+          csv += `Watch,synthetic,${test.timestamp},${r.elapsed},${r.callToResponse || ''},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.timestamp ? Date.now() - r.timestamp : ''},${r.isNewPosition || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
+        });
+      });
+      
+      // Single tests
       testData.singleTests.forEach(r => {
-        csv += `Single,${r.timestamp},${r.elapsed},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
+        csv += `Single,single,${r.timestamp},${r.elapsed},,${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.positionAge || ''},,${r.errorCode || ''},${r.errorMessage || ''}\n`;
       });
       
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `geolocation-test-${Date.now()}.csv`;
+      a.download = `geolocation-test-v2-${Date.now()}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     }
+    
+    // Initialize UI
+    document.getElementById('syntheticIntervalConfig').style.display = 'none';
   </script>
 </body>
 </html>
