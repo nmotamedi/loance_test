@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Geolocation Test Harness v2</title>
+  <title>Geolocation Test Harness v3</title>
   <style>
     * { box-sizing: border-box; }
     body { 
@@ -40,7 +40,7 @@
     button.secondary { background: #28a745; }
     button.secondary:hover { background: #218838; }
     .config { margin-bottom: 15px; }
-    .config label { display: inline-block; width: 180px; }
+    .config label { display: inline-block; width: 200px; }
     .config input, .config select { width: 120px; padding: 5px; }
     .results { 
       background: #f8f9fa; 
@@ -59,13 +59,16 @@
       border-left: 4px solid #007bff;
       background: white;
     }
-    .result-item.error { border-left-color: #dc3545; }
-    .result-item.success { border-left-color: #28a745; }
+    .result-item.error { border-left-color: #dc3545; background: #fff5f5; }
+    .result-item.success { border-left-color: #28a745; background: #f5fff5; }
     .result-item.synthetic { border-left-color: #ffc107; }
     .result-item.native { border-left-color: #007bff; }
+    .result-item.hybrid { border-left-color: #9c27b0; }
     .result-item.timeout-test { border-left-color: #17a2b8; }
     .result-item.cache { border-left-color: #6f42c1; }
     .result-item.warning { border-left-color: #fd7e14; background: #fff3cd; }
+    .result-item.info { border-left-color: #17a2b8; background: #e7f5ff; }
+    .result-item.spoof-check { border-left-color: #9c27b0; background: #f9f5ff; }
     .timestamp { color: #666; font-size: 11px; }
     .label { 
       display: inline-block; 
@@ -77,10 +80,14 @@
     }
     .label.native { background: #007bff; color: white; }
     .label.synthetic { background: #ffc107; color: black; }
+    .label.hybrid { background: #9c27b0; color: white; }
     .label.timeout { background: #17a2b8; color: white; }
     .label.error { background: #dc3545; color: white; }
     .label.cache { background: #6f42c1; color: white; }
     .label.warning { background: #fd7e14; color: white; }
+    .label.pass { background: #28a745; color: white; }
+    .label.fail { background: #dc3545; color: white; }
+    .label.spoof { background: #9c27b0; color: white; }
     .metrics { 
       display: grid; 
       grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
@@ -104,6 +111,7 @@
     .status.idle { background: #e2e3e5; color: #383d41; }
     .mode-selector { 
       display: flex; 
+      flex-direction: column;
       gap: 10px; 
       margin-bottom: 15px; 
       padding: 10px; 
@@ -115,6 +123,11 @@
       align-items: center; 
       gap: 5px;
       cursor: pointer;
+    }
+    .mode-description {
+      font-size: 12px;
+      color: #666;
+      margin-left: 20px;
     }
     .info-box {
       background: #d1ecf1;
@@ -132,11 +145,59 @@
       margin-bottom: 15px;
       font-size: 13px;
     }
+    .spoof-signal { 
+      display: inline-block; 
+      padding: 4px 10px; 
+      margin: 3px; 
+      border-radius: 4px; 
+      font-size: 12px;
+    }
+    .spoof-signal.pass { background: #c6efce; color: #155724; }
+    .spoof-signal.fail { background: #ffc7ce; color: #9c0006; }
+    .spoof-signal.warn { background: #ffeb9c; color: #9c6500; }
+    .spoof-score {
+      font-size: 24px;
+      font-weight: bold;
+      padding: 10px 20px;
+      border-radius: 8px;
+      display: inline-block;
+      margin: 10px 0;
+    }
+    .spoof-score.low { background: #c6efce; color: #155724; }
+    .spoof-score.medium { background: #ffeb9c; color: #9c6500; }
+    .spoof-score.high { background: #ffc7ce; color: #9c0006; }
   </style>
 </head>
 <body>
-  <h1>🌍 Geolocation Test Harness v2</h1>
+  <h1>🌍 Geolocation Test Harness v3</h1>
   
+  <!-- Spoof Detection Signals Test -->
+  <div class="section">
+    <h2>🔍 Spoof Detection Signals Test</h2>
+    <p>Analyzes multiple signals to detect potential location spoofing.</p>
+    
+    <div class="info-box">
+      <strong>Signals checked:</strong> Timestamp age, timestamp precision, altitude data, accuracy variation, 
+      response time, auxiliary data (speed/heading), and more.
+    </div>
+    
+    <div class="config">
+      <label>Number of samples:</label>
+      <input type="number" id="spoofSampleCount" value="5" min="1" max="20">
+    </div>
+    <div class="config">
+      <label>Sample interval (ms):</label>
+      <input type="number" id="spoofSampleInterval" value="1000" min="500" max="10000">
+    </div>
+    
+    <button onclick="runSpoofDetectionTest()">Run Spoof Detection Test</button>
+    <button class="clear" onclick="clearSpoofResults()">Clear Results</button>
+    
+    <div id="spoofResults" class="results" style="margin-top: 15px;">
+      <em>Click "Run Spoof Detection Test" to analyze location signals...</em>
+    </div>
+  </div>
+
   <!-- Quick Timeout Test Section -->
   <div class="section">
     <h2>⚡ Quick Timeout Spoof Detection Test (with Cache Detection)</h2>
@@ -144,7 +205,7 @@
     
     <div class="info-box">
       <strong>How it works:</strong> First detects if cached location exists, then runs timeout tests. 
-      If cache is fresh (&lt;5s old), fast responses are expected and NOT suspicious.
+      Real locations timeout (PASS ✓). Instant responses are suspicious (FAIL ✗).
     </div>
     
     <div class="config">
@@ -163,10 +224,10 @@
   <!-- Watch Test Section - Now with Mode Selection -->
   <div class="section">
     <h2>🔄 Watch Position Test</h2>
-    <p>Test native watchPosition OR synthetic polling independently for clean data.</p>
+    <p>Test different watch strategies for accuracy and timing comparison.</p>
     
     <div class="warning-box">
-      <strong>⚠️ Important:</strong> Run native and synthetic tests SEPARATELY to avoid resource contention 
+      <strong>⚠️ Important:</strong> Run each mode SEPARATELY to avoid resource contention 
       and get accurate independent measurements.
     </div>
     
@@ -176,19 +237,33 @@
         <input type="radio" name="watchMode" value="native" checked>
         Native Watch (browser-controlled timing)
       </label>
+      <div class="mode-description">Uses watchPosition — browser decides when to fire callbacks</div>
+      
       <label>
         <input type="radio" name="watchMode" value="synthetic">
         Synthetic Watch (fixed interval polling)
       </label>
+      <div class="mode-description">Uses setInterval + getCurrentPosition — you control timing</div>
+      
+      <label>
+        <input type="radio" name="watchMode" value="hybrid">
+        Hybrid Watch (interval of short native watches)
+      </label>
+      <div class="mode-description">Uses setInterval to start/stop short watchPosition sessions — combines benefits of both</div>
     </div>
     
     <div class="config">
       <label>Watch Duration (seconds):</label>
       <input type="number" id="watchDuration" value="30" min="5" max="300">
     </div>
-    <div class="config" id="syntheticIntervalConfig">
-      <label>Synthetic Interval (ms):</label>
+    <div class="config" id="intervalConfig">
+      <label>Polling Interval (ms):</label>
       <input type="number" id="syntheticInterval" value="3000" min="500" max="30000">
+    </div>
+    <div class="config" id="hybridDurationConfig" style="display: none;">
+      <label>Hybrid Watch Window (ms):</label>
+      <input type="number" id="hybridWatchWindow" value="500" min="100" max="2000">
+      <span style="font-size: 12px; color: #666;"> (how long each mini-watch runs)</span>
     </div>
     <div class="config">
       <label>Enable High Accuracy:</label>
@@ -197,7 +272,6 @@
     <div class="config">
       <label>Request Timeout (ms):</label>
       <input type="number" id="requestTimeout" value="10000" min="1000" max="60000">
-      <span style="font-size: 12px; color: #666;"> (for synthetic getCurrentPosition calls)</span>
     </div>
     
     <button onclick="startWatchTest()">Start Test</button>
@@ -221,16 +295,16 @@
         <div class="metric-label">Avg Accuracy (m)</div>
       </div>
       <div class="metric">
-        <div class="metric-value" id="minAccuracy">-</div>
-        <div class="metric-label">Best Accuracy (m)</div>
-      </div>
-      <div class="metric">
-        <div class="metric-value" id="maxAccuracy">-</div>
-        <div class="metric-label">Worst Accuracy (m)</div>
+        <div class="metric-value" id="avgSpeed">-</div>
+        <div class="metric-label">Avg Speed (m/s)</div>
       </div>
       <div class="metric">
         <div class="metric-value" id="uniquePositions">0</div>
         <div class="metric-label">Unique Positions</div>
+      </div>
+      <div class="metric">
+        <div class="metric-value" id="duplicatePercent">0%</div>
+        <div class="metric-label">Duplicate %</div>
       </div>
     </div>
     
@@ -271,29 +345,383 @@
   <script>
     // ==================== STATE ====================
     let testData = {
+      spoofDetectionTests: [],
       timeoutTests: [],
       nativeWatchTests: [],
       syntheticWatchTests: [],
+      hybridWatchTests: [],
       singleTests: []
     };
     
     let watchState = {
       watchID: null,
       intervalID: null,
+      hybridIntervalID: null,
       durationTimeoutID: null,
       startTime: null,
       mode: null,
       results: [],
-      positionTimestamps: new Set() // Track unique positions
+      positionTimestamps: new Set(),
+      lastPosition: null,
+      lastTimestamp: null
+    };
+
+    // Spoof detection state
+    let spoofState = {
+      running: false,
+      samples: [],
+      intervalID: null
     };
 
     // Update UI based on mode selection
     document.querySelectorAll('input[name="watchMode"]').forEach(radio => {
       radio.addEventListener('change', (e) => {
-        const intervalConfig = document.getElementById('syntheticIntervalConfig');
-        intervalConfig.style.display = e.target.value === 'synthetic' ? 'block' : 'none';
+        const intervalConfig = document.getElementById('intervalConfig');
+        const hybridConfig = document.getElementById('hybridDurationConfig');
+        
+        if (e.target.value === 'native') {
+          intervalConfig.style.display = 'none';
+          hybridConfig.style.display = 'none';
+        } else if (e.target.value === 'synthetic') {
+          intervalConfig.style.display = 'block';
+          hybridConfig.style.display = 'none';
+        } else if (e.target.value === 'hybrid') {
+          intervalConfig.style.display = 'block';
+          hybridConfig.style.display = 'block';
+        }
       });
     });
+
+    // ==================== UTILITY FUNCTIONS ====================
+    function haversineDistance(lat1, lon1, lat2, lon2) {
+      const R = 6371000; // Earth's radius in meters
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    function detectPlatform() {
+      const ua = navigator.userAgent;
+      if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+      if (/Android/.test(ua)) return 'Android';
+      return 'Desktop';
+    }
+
+    // ==================== SPOOF DETECTION SIGNALS TEST ====================
+    function runSpoofDetectionTest() {
+      if (spoofState.running) {
+        alert('Test already running');
+        return;
+      }
+      
+      const sampleCount = parseInt(document.getElementById('spoofSampleCount').value);
+      const sampleInterval = parseInt(document.getElementById('spoofSampleInterval').value);
+      
+      spoofState.running = true;
+      spoofState.samples = [];
+      
+      const resultsDiv = document.getElementById('spoofResults');
+      resultsDiv.innerHTML = `<div class="result-item info">
+        <span class="label timeout">COLLECTING</span>
+        Gathering ${sampleCount} samples at ${sampleInterval}ms intervals...
+        <div class="timestamp">${new Date().toISOString()}</div>
+      </div>`;
+      
+      let collected = 0;
+      const options = {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000
+      };
+      
+      function collectSample() {
+        const callTime = Date.now();
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const responseTime = Date.now() - callTime;
+            const now = Date.now();
+            
+            const sample = {
+              sampleNumber: collected + 1,
+              callTime: callTime,
+              responseTime: responseTime,
+              timestamp: position.timestamp,
+              timestampAge: now - position.timestamp,
+              timestampModulo1000: position.timestamp % 1000,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              altitude: position.coords.altitude,
+              altitudeAccuracy: position.coords.altitudeAccuracy,
+              speed: position.coords.speed,
+              heading: position.coords.heading
+            };
+            
+            // Calculate distance/speed from previous sample
+            if (spoofState.samples.length > 0) {
+              const prev = spoofState.samples[spoofState.samples.length - 1];
+              sample.distanceFromPrev = haversineDistance(
+                prev.latitude, prev.longitude,
+                sample.latitude, sample.longitude
+              );
+              sample.timeDeltaFromPrev = sample.timestamp - prev.timestamp;
+              sample.calculatedSpeed = sample.timeDeltaFromPrev > 0 
+                ? (sample.distanceFromPrev / (sample.timeDeltaFromPrev / 1000)) 
+                : null;
+              sample.accuracyChanged = sample.accuracy !== prev.accuracy;
+              sample.timestampProgressed = sample.timestamp > prev.timestamp;
+            }
+            
+            spoofState.samples.push(sample);
+            collected++;
+            
+            resultsDiv.innerHTML = `<div class="result-item info">
+              <span class="label timeout">COLLECTING</span>
+              Sample ${collected}/${sampleCount} collected (${responseTime}ms response)
+              <div class="timestamp">${new Date().toISOString()}</div>
+            </div>` + resultsDiv.innerHTML;
+            
+            if (collected >= sampleCount) {
+              clearInterval(spoofState.intervalID);
+              spoofState.running = false;
+              analyzeSpoofSignals(resultsDiv);
+            }
+          },
+          (error) => {
+            collected++;
+            spoofState.samples.push({
+              sampleNumber: collected,
+              error: true,
+              errorCode: error.code,
+              errorMessage: error.message
+            });
+            
+            if (collected >= sampleCount) {
+              clearInterval(spoofState.intervalID);
+              spoofState.running = false;
+              analyzeSpoofSignals(resultsDiv);
+            }
+          },
+          options
+        );
+      }
+      
+      // Collect first sample immediately
+      collectSample();
+      
+      // Then at intervals
+      spoofState.intervalID = setInterval(collectSample, sampleInterval);
+    }
+    
+    function analyzeSpoofSignals(resultsDiv) {
+      const samples = spoofState.samples.filter(s => !s.error);
+      
+      if (samples.length === 0) {
+        resultsDiv.innerHTML = `<div class="result-item error">
+          <span class="label error">ERROR</span>
+          No valid samples collected
+        </div>` + resultsDiv.innerHTML;
+        return;
+      }
+      
+      const platform = detectPlatform();
+      const isMobile = platform !== 'Desktop';
+      
+      // Calculate signal checks
+      const signals = [];
+      let suspicionScore = 0;
+      
+      // 1. Response Time Check
+      const avgResponseTime = samples.reduce((a, b) => a + b.responseTime, 0) / samples.length;
+      const fastResponses = samples.filter(s => s.responseTime < 50).length;
+      if (fastResponses === samples.length && samples.length > 1) {
+        signals.push({ name: 'Response Time', status: 'fail', detail: `All ${samples.length} responses < 50ms (avg: ${avgResponseTime.toFixed(0)}ms)` });
+        suspicionScore += 3;
+      } else if (fastResponses > samples.length / 2) {
+        signals.push({ name: 'Response Time', status: 'warn', detail: `${fastResponses}/${samples.length} responses < 50ms` });
+        suspicionScore += 1;
+      } else {
+        signals.push({ name: 'Response Time', status: 'pass', detail: `Avg response: ${avgResponseTime.toFixed(0)}ms` });
+      }
+      
+      // 2. Timestamp Age Check (should be recent but not instant)
+      const avgTimestampAge = samples.reduce((a, b) => a + b.timestampAge, 0) / samples.length;
+      const instantTimestamps = samples.filter(s => s.timestampAge < 5).length;
+      if (instantTimestamps === samples.length) {
+        signals.push({ name: 'Timestamp Age', status: 'fail', detail: `All timestamps are instant (< 5ms old)` });
+        suspicionScore += 2;
+      } else if (avgTimestampAge < 20) {
+        signals.push({ name: 'Timestamp Age', status: 'warn', detail: `Avg timestamp age: ${avgTimestampAge.toFixed(0)}ms (very fresh)` });
+        suspicionScore += 1;
+      } else {
+        signals.push({ name: 'Timestamp Age', status: 'pass', detail: `Avg timestamp age: ${avgTimestampAge.toFixed(0)}ms` });
+      }
+      
+      // 3. Timestamp Precision Check (real timestamps have ms precision, spoofed often round)
+      const roundTimestamps = samples.filter(s => s.timestampModulo1000 === 0).length;
+      if (roundTimestamps === samples.length && samples.length > 2) {
+        signals.push({ name: 'Timestamp Precision', status: 'fail', detail: `All timestamps are round (no ms precision)` });
+        suspicionScore += 2;
+      } else if (roundTimestamps > 0) {
+        signals.push({ name: 'Timestamp Precision', status: 'warn', detail: `${roundTimestamps}/${samples.length} timestamps are round` });
+        suspicionScore += 0.5;
+      } else {
+        signals.push({ name: 'Timestamp Precision', status: 'pass', detail: `All timestamps have ms precision` });
+      }
+      
+      // 4. Altitude Data Check (mobile should have altitude)
+      const hasAltitude = samples.filter(s => s.altitude !== null).length;
+      if (isMobile && hasAltitude === 0) {
+        signals.push({ name: 'Altitude Data', status: 'fail', detail: `No altitude data on mobile device` });
+        suspicionScore += 2;
+      } else if (hasAltitude === 0) {
+        signals.push({ name: 'Altitude Data', status: 'warn', detail: `No altitude data (normal for desktop)` });
+      } else {
+        signals.push({ name: 'Altitude Data', status: 'pass', detail: `${hasAltitude}/${samples.length} samples have altitude` });
+      }
+      
+      // 5. Altitude Accuracy Check
+      const hasAltitudeAccuracy = samples.filter(s => s.altitudeAccuracy !== null).length;
+      if (isMobile && hasAltitudeAccuracy === 0) {
+        signals.push({ name: 'Altitude Accuracy', status: 'fail', detail: `No altitude accuracy on mobile` });
+        suspicionScore += 1;
+      } else if (hasAltitudeAccuracy > 0) {
+        signals.push({ name: 'Altitude Accuracy', status: 'pass', detail: `${hasAltitudeAccuracy}/${samples.length} samples have altitude accuracy` });
+      }
+      
+      // 6. Accuracy Variation Check (real GPS accuracy varies)
+      const uniqueAccuracies = new Set(samples.map(s => s.accuracy)).size;
+      if (uniqueAccuracies === 1 && samples.length > 3) {
+        signals.push({ name: 'Accuracy Variation', status: 'fail', detail: `All ${samples.length} samples have identical accuracy (${samples[0].accuracy}m)` });
+        suspicionScore += 2;
+      } else if (uniqueAccuracies < samples.length / 2 && samples.length > 3) {
+        signals.push({ name: 'Accuracy Variation', status: 'warn', detail: `Only ${uniqueAccuracies} unique accuracy values in ${samples.length} samples` });
+        suspicionScore += 0.5;
+      } else {
+        signals.push({ name: 'Accuracy Variation', status: 'pass', detail: `${uniqueAccuracies} unique accuracy values` });
+      }
+      
+      // 7. Timestamp Progression Check
+      const samplesWithPrev = samples.filter(s => s.timestampProgressed !== undefined);
+      const timestampsProgressed = samplesWithPrev.filter(s => s.timestampProgressed).length;
+      if (samplesWithPrev.length > 0 && timestampsProgressed === 0) {
+        signals.push({ name: 'Timestamp Progression', status: 'fail', detail: `Timestamps not progressing between samples` });
+        suspicionScore += 3;
+      } else if (samplesWithPrev.length > 0) {
+        signals.push({ name: 'Timestamp Progression', status: 'pass', detail: `${timestampsProgressed}/${samplesWithPrev.length} timestamps progressed` });
+      }
+      
+      // 8. Speed/Heading Data Check
+      const hasSpeed = samples.filter(s => s.speed !== null).length;
+      const hasHeading = samples.filter(s => s.heading !== null).length;
+      if (hasSpeed > 0 || hasHeading > 0) {
+        signals.push({ name: 'Motion Data', status: 'pass', detail: `Speed: ${hasSpeed}/${samples.length}, Heading: ${hasHeading}/${samples.length}` });
+      } else {
+        signals.push({ name: 'Motion Data', status: 'warn', detail: `No speed/heading data (may be stationary)` });
+      }
+      
+      // 9. Position Variation Check (if stationary, positions should be very similar)
+      const positionsWithDistance = samples.filter(s => s.distanceFromPrev !== undefined);
+      if (positionsWithDistance.length > 0) {
+        const avgDistance = positionsWithDistance.reduce((a, b) => a + b.distanceFromPrev, 0) / positionsWithDistance.length;
+        const maxDistance = Math.max(...positionsWithDistance.map(s => s.distanceFromPrev));
+        if (maxDistance < 1 && samples.length > 3) {
+          signals.push({ name: 'Position Variation', status: 'warn', detail: `Very static positions (max move: ${maxDistance.toFixed(2)}m) - could be spoofed or stationary` });
+        } else {
+          signals.push({ name: 'Position Variation', status: 'pass', detail: `Avg move: ${avgDistance.toFixed(2)}m, Max: ${maxDistance.toFixed(2)}m` });
+        }
+      }
+      
+      // Calculate overall score
+      const maxScore = 15; // Approximate max suspicion score
+      const normalizedScore = Math.min(100, Math.round((suspicionScore / maxScore) * 100));
+      
+      let scoreClass = 'low';
+      let scoreLabel = 'LOW RISK';
+      if (normalizedScore > 60) {
+        scoreClass = 'high';
+        scoreLabel = 'HIGH RISK';
+      } else if (normalizedScore > 30) {
+        scoreClass = 'medium';
+        scoreLabel = 'MEDIUM RISK';
+      }
+      
+      // Build results HTML
+      let html = `<div class="result-item spoof-check">
+        <h3>Spoof Detection Analysis</h3>
+        <p>Platform: <strong>${platform}</strong> | Samples: <strong>${samples.length}</strong></p>
+        
+        <div class="spoof-score ${scoreClass}">
+          Suspicion Score: ${normalizedScore}% - ${scoreLabel}
+        </div>
+        
+        <h4>Signal Checks:</h4>
+        <div>`;
+      
+      signals.forEach(signal => {
+        html += `<span class="spoof-signal ${signal.status}">
+          ${signal.status === 'pass' ? '✓' : signal.status === 'fail' ? '✗' : '⚠'} 
+          ${signal.name}: ${signal.detail}
+        </span>`;
+      });
+      
+      html += `</div>
+        
+        <h4>Raw Sample Data:</h4>
+        <table>
+          <tr>
+            <th>#</th>
+            <th>Response (ms)</th>
+            <th>Timestamp Age</th>
+            <th>Accuracy (m)</th>
+            <th>Altitude</th>
+            <th>Speed</th>
+            <th>Calc Speed</th>
+          </tr>`;
+      
+      samples.forEach(s => {
+        html += `<tr>
+          <td>${s.sampleNumber}</td>
+          <td>${s.responseTime}</td>
+          <td>${s.timestampAge}ms</td>
+          <td>${s.accuracy?.toFixed(1)}</td>
+          <td>${s.altitude?.toFixed(1) || 'null'}</td>
+          <td>${s.speed?.toFixed(2) || 'null'}</td>
+          <td>${s.calculatedSpeed?.toFixed(2) || '-'}</td>
+        </tr>`;
+      });
+      
+      html += `</table>
+        <div class="timestamp">${new Date().toISOString()}</div>
+      </div>`;
+      
+      // Store for export
+      testData.spoofDetectionTests.push({
+        timestamp: new Date().toISOString(),
+        platform: platform,
+        sampleCount: samples.length,
+        suspicionScore: normalizedScore,
+        signals: signals,
+        samples: samples
+      });
+      
+      resultsDiv.innerHTML = html + resultsDiv.innerHTML;
+    }
+    
+    function clearSpoofResults() {
+      if (spoofState.intervalID) {
+        clearInterval(spoofState.intervalID);
+      }
+      spoofState.running = false;
+      spoofState.samples = [];
+      document.getElementById('spoofResults').innerHTML = '<em>Click "Run Spoof Detection Test" to analyze location signals...</em>';
+      testData.spoofDetectionTests = [];
+    }
 
     // ==================== QUICK TIMEOUT TEST WITH CACHE DETECTION ====================
     function runTimeoutTestWithCacheCheck() {
@@ -309,7 +737,7 @@
       const testStartTime = Date.now();
       const testId = `TT-${testStartTime}`;
       
-      resultsDiv.innerHTML = `<div class="result-item timeout-test">
+      resultsDiv.innerHTML = `<div class="result-item info">
         <span class="label timeout">PHASE 1</span>
         Checking for cached location...
         <div class="timestamp">${new Date().toISOString()}</div>
@@ -338,8 +766,8 @@
           // Warn if cache is fresh
           if (positionAge < 5000) {
             resultsDiv.innerHTML = `<div class="result-item warning">
-              <span class="label warning">WARNING</span>
-              Fresh cache detected (${positionAge}ms old). Fast timeout responses may be from cache, not spoofing.
+              <span class="label warning">NOTE</span>
+              Fresh cache detected (${positionAge}ms old). Instant responses may be from cache, not spoofing.
               <div class="timestamp">${new Date().toISOString()}</div>
             </div>` + resultsDiv.innerHTML;
           }
@@ -357,7 +785,7 @@
           };
           
           resultsDiv.innerHTML = `<div class="result-item success">
-            <span class="label cache">NO CACHE</span>
+            <span class="label pass">NO CACHE</span>
             No cached position available (Error ${error.code}: ${error.message})
             <div class="timestamp">${new Date().toISOString()}</div>
           </div>` + resultsDiv.innerHTML;
@@ -374,7 +802,7 @@
     }
     
     function runActualTimeoutTests(timeouts, cacheInfo, testId, testStartTime, resultsDiv) {
-      resultsDiv.innerHTML = `<div class="result-item timeout-test">
+      resultsDiv.innerHTML = `<div class="result-item info">
         <span class="label timeout">PHASE 2</span>
         Running timeout tests: ${timeouts.join('ms, ')}ms
         <div class="timestamp">${new Date().toISOString()}</div>
@@ -406,7 +834,7 @@
           (error) => {
             const elapsed = Date.now() - start;
             results[`tt_${timeout}`] = {
-              status: 'FAIL',
+              status: 'TIMEOUT',
               elapsed: elapsed,
               errorCode: error.code,
               errorMessage: error.message
@@ -447,20 +875,20 @@
         suspicionReason = `${successes.length} instant response(s) despite stale cache (${cacheInfo.positionAge}ms old)`;
       }
       
-      let html = `<div class="result-item timeout-test">
+      let html = `<div class="result-item info">
         <span class="label timeout">COMPLETE</span>
         Total time: ${totalTime}ms
         <div class="timestamp">${new Date().toISOString()}</div>
       </div>`;
       
-      // Verdict
+      // Verdict - SWAPPED: timeouts are good (real location), instant is bad (potential spoof)
       if (isSuspicious) {
         html += `<div class="result-item error">
           <strong>⚠️ SUSPICIOUS:</strong> ${suspicionReason}
         </div>`;
       } else if (successes.length > 0 && cachedSuccesses.length === successes.length) {
         html += `<div class="result-item warning">
-          <strong>ℹ️ CACHED:</strong> ${successes.length} success(es) from cached position - NOT suspicious
+          <strong>ℹ️ CACHED:</strong> ${successes.length} response(s) from cached position - NOT suspicious
         </div>`;
       } else {
         html += `<div class="result-item success">
@@ -468,15 +896,31 @@
         </div>`;
       }
       
-      // Results table
+      // Results table - SWAPPED colors: TIMEOUT = green (pass), SUCCESS = red (fail for spoof detection)
       html += `<table>
-        <tr><th>Timeout</th><th>Status</th><th>Elapsed</th><th>Position Age</th><th>From Cache?</th><th>Details</th></tr>`;
+        <tr><th>Timeout</th><th>Result</th><th>Elapsed</th><th>Position Age</th><th>From Cache?</th><th>Details</th></tr>`;
       
       timeoutResults.forEach(([key, value]) => {
         const timeout = key.replace('tt_', '');
+        const isTimeout = value.status === 'TIMEOUT';
+        const isCached = value.isCachedResponse;
+        
+        // Color logic: TIMEOUT = good (green), SUCCESS from cache = yellow, SUCCESS fresh = bad (red)
+        let statusIcon, statusClass;
+        if (isTimeout) {
+          statusIcon = '✓ TIMEOUT';
+          statusClass = 'pass';
+        } else if (isCached) {
+          statusIcon = '⚡ CACHED';
+          statusClass = 'warning';
+        } else {
+          statusIcon = '✗ INSTANT';
+          statusClass = 'fail';
+        }
+        
         html += `<tr>
           <td>${timeout}ms</td>
-          <td>${value.status === 'SUCCESS' ? '🟢 SUCCESS' : '🔴 FAIL'}</td>
+          <td><span class="label ${statusClass}">${statusIcon}</span></td>
           <td>${value.elapsed}ms</td>
           <td>${value.positionAge ? value.positionAge + 'ms' : '-'}</td>
           <td>${value.isCachedResponse ? '✓ Yes' : value.status === 'SUCCESS' ? '✗ No (Fresh!)' : '-'}</td>
@@ -505,16 +949,17 @@
       testData.timeoutTests = [];
     }
 
-    // ==================== WATCH TEST (NATIVE OR SYNTHETIC) ====================
+    // ==================== WATCH TEST (NATIVE, SYNTHETIC, OR HYBRID) ====================
     function startWatchTest() {
-      if (watchState.watchID !== null || watchState.intervalID !== null) {
+      if (watchState.watchID !== null || watchState.intervalID !== null || watchState.hybridIntervalID !== null) {
         alert('Test already running. Stop it first.');
         return;
       }
       
       const mode = document.querySelector('input[name="watchMode"]:checked').value;
       const duration = parseInt(document.getElementById('watchDuration').value) * 1000;
-      const syntheticInterval = parseInt(document.getElementById('syntheticInterval').value);
+      const interval = parseInt(document.getElementById('syntheticInterval').value);
+      const hybridWindow = parseInt(document.getElementById('hybridWatchWindow').value);
       const highAccuracy = document.getElementById('highAccuracy').checked;
       const requestTimeout = parseInt(document.getElementById('requestTimeout').value);
       
@@ -522,6 +967,8 @@
       watchState.mode = mode;
       watchState.results = [];
       watchState.positionTimestamps = new Set();
+      watchState.lastPosition = null;
+      watchState.lastTimestamp = null;
       
       const resultsDiv = document.getElementById('watchResults');
       resultsDiv.innerHTML = '';
@@ -535,8 +982,10 @@
       
       if (mode === 'native') {
         startNativeWatch(highAccuracy, requestTimeout, duration);
-      } else {
-        startSyntheticWatch(highAccuracy, requestTimeout, syntheticInterval, duration);
+      } else if (mode === 'synthetic') {
+        startSyntheticWatch(highAccuracy, requestTimeout, interval, duration);
+      } else if (mode === 'hybrid') {
+        startHybridWatch(highAccuracy, requestTimeout, interval, hybridWindow, duration);
       }
     }
     
@@ -567,7 +1016,6 @@
         timeout: timeout
       };
       
-      // Track call times for accurate elapsed calculation
       function makeSyntheticCall() {
         const callTime = Date.now();
         navigator.geolocation.getCurrentPosition(
@@ -590,18 +1038,82 @@
       }, duration);
     }
     
-    function handleWatchResult(position, type, callTime = null) {
+    function startHybridWatch(highAccuracy, timeout, interval, watchWindow, duration) {
+      const options = {
+        enableHighAccuracy: highAccuracy,
+        maximumAge: 0,
+        timeout: timeout
+      };
+      
+      let hybridSessionCount = 0;
+      
+      function runHybridSession() {
+        hybridSessionCount++;
+        const sessionNum = hybridSessionCount;
+        
+        // Start a short watchPosition session
+        const tempWatchId = navigator.geolocation.watchPosition(
+          (position) => handleWatchResult(position, 'hybrid', null, sessionNum),
+          (error) => handleWatchError(error, 'hybrid', null, sessionNum),
+          options
+        );
+        
+        // Stop it after the window duration
+        setTimeout(() => {
+          navigator.geolocation.clearWatch(tempWatchId);
+        }, watchWindow);
+      }
+      
+      // Fire immediately
+      runHybridSession();
+      
+      // Then at intervals
+      watchState.hybridIntervalID = setInterval(runHybridSession, interval);
+      
+      // Auto-stop after duration
+      watchState.durationTimeoutID = setTimeout(() => {
+        stopWatchTest();
+        addWatchResultItem({ type: 'system', message: `Hybrid watch completed after ${duration/1000}s (${hybridSessionCount} sessions)` });
+      }, duration);
+    }
+    
+    function handleWatchResult(position, type, callTime = null, sessionNum = null) {
       const elapsed = Date.now() - watchState.startTime;
+      
+      // Calculate speed from previous position
+      let calculatedSpeed = null;
+      let distanceFromPrev = null;
+      if (watchState.lastPosition && watchState.lastTimestamp) {
+        distanceFromPrev = haversineDistance(
+          watchState.lastPosition.latitude, watchState.lastPosition.longitude,
+          position.coords.latitude, position.coords.longitude
+        );
+        const timeDelta = (position.timestamp - watchState.lastTimestamp) / 1000;
+        if (timeDelta > 0) {
+          calculatedSpeed = distanceFromPrev / timeDelta;
+        }
+      }
+      
+      watchState.lastPosition = { 
+        latitude: position.coords.latitude, 
+        longitude: position.coords.longitude 
+      };
+      watchState.lastTimestamp = position.timestamp;
+      
       const result = {
         type: type,
         elapsed: elapsed,
         callToResponse: callTime ? Date.now() - callTime : null,
+        hybridSession: sessionNum,
         accuracy: position.coords.accuracy,
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         altitude: position.coords.altitude,
+        altitudeAccuracy: position.coords.altitudeAccuracy,
         speed: position.coords.speed,
         heading: position.coords.heading,
+        calculatedSpeed: calculatedSpeed,
+        distanceFromPrev: distanceFromPrev,
         timestamp: position.timestamp,
         receivedAt: Date.now(),
         isNewPosition: !watchState.positionTimestamps.has(position.timestamp)
@@ -613,12 +1125,13 @@
       updateWatchMetrics();
     }
     
-    function handleWatchError(error, type, callTime = null) {
+    function handleWatchError(error, type, callTime = null, sessionNum = null) {
       const elapsed = Date.now() - watchState.startTime;
       const result = {
         type: type,
         elapsed: elapsed,
         callToResponse: callTime ? Date.now() - callTime : null,
+        hybridSession: sessionNum,
         error: true,
         errorCode: error.code,
         errorMessage: error.message,
@@ -637,7 +1150,7 @@
       let content = '';
       
       if (result.type === 'system') {
-        className += ' timeout-test';
+        className += ' info';
         label = '<span class="label timeout">SYSTEM</span>';
         content = result.message;
       } else if (result.error) {
@@ -647,17 +1160,28 @@
         if (result.callToResponse) {
           content += ` | Response time: ${result.callToResponse}ms`;
         }
+        if (result.hybridSession) {
+          content += ` | Session #${result.hybridSession}`;
+        }
       } else {
         className += ` ${result.type}`;
         label = `<span class="label ${result.type}">${result.type.toUpperCase()}</span>`;
         if (!result.isNewPosition) {
-          label += '<span class="label warning">DUPLICATE</span>';
+          label += '<span class="label warning">DUP</span>';
         }
-        content = `Accuracy: ${result.accuracy?.toFixed(1)}m | Lat: ${result.latitude?.toFixed(6)} | Lng: ${result.longitude?.toFixed(6)}`;
+        if (result.hybridSession) {
+          label += `<span class="label" style="background:#ddd;color:#333">S${result.hybridSession}</span>`;
+        }
+        content = `Accuracy: ${result.accuracy?.toFixed(1)}m`;
+        if (result.speed !== null) {
+          content += ` | Speed: ${result.speed?.toFixed(2)} m/s`;
+        }
+        if (result.calculatedSpeed !== null) {
+          content += ` | CalcSpeed: ${result.calculatedSpeed?.toFixed(2)} m/s`;
+        }
         if (result.callToResponse) {
           content += ` | Response: ${result.callToResponse}ms`;
         }
-        content += ` | Position age: ${Date.now() - result.timestamp}ms`;
       }
       
       const html = `<div class="${className}">
@@ -673,19 +1197,24 @@
       const successResults = watchState.results.filter(r => !r.error);
       const errorResults = watchState.results.filter(r => r.error);
       const accuracies = successResults.map(r => r.accuracy);
+      const speeds = successResults.map(r => r.calculatedSpeed).filter(s => s !== null && s !== undefined);
       const uniqueCount = watchState.positionTimestamps.size;
+      const totalCount = successResults.length;
+      const duplicatePercent = totalCount > 0 ? ((totalCount - uniqueCount) / totalCount * 100) : 0;
       
       document.getElementById('callbackCount').textContent = successResults.length;
       document.getElementById('errorCount').textContent = errorResults.length;
       document.getElementById('uniquePositions').textContent = uniqueCount;
+      document.getElementById('duplicatePercent').textContent = duplicatePercent.toFixed(1) + '%';
       
       if (accuracies.length > 0) {
         const avg = accuracies.reduce((a, b) => a + b, 0) / accuracies.length;
-        const min = Math.min(...accuracies);
-        const max = Math.max(...accuracies);
         document.getElementById('avgAccuracy').textContent = avg.toFixed(1);
-        document.getElementById('minAccuracy').textContent = min.toFixed(1);
-        document.getElementById('maxAccuracy').textContent = max.toFixed(1);
+      }
+      
+      if (speeds.length > 0) {
+        const avgSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+        document.getElementById('avgSpeed').textContent = avgSpeed.toFixed(2);
       }
     }
     
@@ -697,6 +1226,10 @@
       if (watchState.intervalID !== null) {
         clearInterval(watchState.intervalID);
         watchState.intervalID = null;
+      }
+      if (watchState.hybridIntervalID !== null) {
+        clearInterval(watchState.hybridIntervalID);
+        watchState.hybridIntervalID = null;
       }
       if (watchState.durationTimeoutID !== null) {
         clearTimeout(watchState.durationTimeoutID);
@@ -719,8 +1252,10 @@
         
         if (watchState.mode === 'native') {
           testData.nativeWatchTests.push(testRecord);
-        } else {
+        } else if (watchState.mode === 'synthetic') {
           testData.syntheticWatchTests.push(testRecord);
+        } else if (watchState.mode === 'hybrid') {
+          testData.hybridWatchTests.push(testRecord);
         }
       }
     }
@@ -728,9 +1263,10 @@
     function calculateSummary(results) {
       const successResults = results.filter(r => !r.error);
       const accuracies = successResults.map(r => r.accuracy);
+      const speeds = successResults.map(r => r.calculatedSpeed).filter(s => s !== null);
       
       if (accuracies.length === 0) {
-        return { callbacks: 0, errors: results.length };
+        return { callbacks: 0, errors: results.filter(r => r.error).length };
       }
       
       return {
@@ -738,7 +1274,8 @@
         errors: results.filter(r => r.error).length,
         avgAccuracy: accuracies.reduce((a, b) => a + b, 0) / accuracies.length,
         minAccuracy: Math.min(...accuracies),
-        maxAccuracy: Math.max(...accuracies)
+        maxAccuracy: Math.max(...accuracies),
+        avgCalculatedSpeed: speeds.length > 0 ? speeds.reduce((a, b) => a + b, 0) / speeds.length : null
       };
     }
     
@@ -748,14 +1285,16 @@
       document.getElementById('callbackCount').textContent = '0';
       document.getElementById('errorCount').textContent = '0';
       document.getElementById('avgAccuracy').textContent = '-';
-      document.getElementById('minAccuracy').textContent = '-';
-      document.getElementById('maxAccuracy').textContent = '-';
+      document.getElementById('avgSpeed').textContent = '-';
       document.getElementById('uniquePositions').textContent = '0';
+      document.getElementById('duplicatePercent').textContent = '0%';
       document.getElementById('watchStatus').textContent = 'Idle';
       document.getElementById('watchStatus').className = 'status idle';
       document.getElementById('watchMode').textContent = '';
       watchState.results = [];
       watchState.positionTimestamps = new Set();
+      watchState.lastPosition = null;
+      watchState.lastTimestamp = null;
     }
 
     // ==================== SINGLE LOCATION TEST ====================
@@ -766,7 +1305,7 @@
       
       const startTime = Date.now();
       
-      resultsDiv.innerHTML = `<div class="result-item">
+      resultsDiv.innerHTML = `<div class="result-item info">
         <span class="label native">REQUESTING</span>
         Timeout: ${timeout}ms, MaxAge: ${maxAge}ms
         <div class="timestamp">${new Date().toISOString()}</div>
@@ -783,6 +1322,7 @@
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             altitude: position.coords.altitude,
+            altitudeAccuracy: position.coords.altitudeAccuracy,
             speed: position.coords.speed,
             heading: position.coords.heading,
             timestamp: position.timestamp
@@ -794,13 +1334,13 @@
           });
           
           resultsDiv.innerHTML = `<div class="result-item success">
-            <span class="label native">SUCCESS</span> in ${elapsed}ms
+            <span class="label pass">SUCCESS</span> in ${elapsed}ms
             <div>
               <strong>Accuracy:</strong> ${result.accuracy?.toFixed(1)}m<br>
               <strong>Position:</strong> ${result.latitude?.toFixed(6)}, ${result.longitude?.toFixed(6)}<br>
               <strong>Position Age:</strong> ${positionAge}ms<br>
-              <strong>Altitude:</strong> ${result.altitude?.toFixed(1) || 'N/A'}m<br>
-              <strong>Speed:</strong> ${result.speed?.toFixed(1) || 'N/A'} m/s<br>
+              <strong>Altitude:</strong> ${result.altitude?.toFixed(1) || 'N/A'}m (±${result.altitudeAccuracy?.toFixed(1) || 'N/A'}m)<br>
+              <strong>Speed:</strong> ${result.speed?.toFixed(2) || 'N/A'} m/s<br>
               <strong>Heading:</strong> ${result.heading?.toFixed(1) || 'N/A'}°
             </div>
             <div class="timestamp">${new Date().toISOString()}</div>
@@ -841,6 +1381,7 @@
       const data = {
         exportedAt: new Date().toISOString(),
         userAgent: navigator.userAgent,
+        platform: detectPlatform(),
         ...testData
       };
       
@@ -848,51 +1389,83 @@
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `geolocation-test-v2-${Date.now()}.json`;
+      a.download = `geolocation-test-v3-${Date.now()}.json`;
       a.click();
       URL.revokeObjectURL(url);
     }
     
     function exportCSV() {
-      let csv = 'Test Type,Mode,Timestamp,Elapsed (ms),Call-to-Response (ms),Status,Accuracy (m),Latitude,Longitude,Position Age (ms),Is New Position,Error Code,Error Message\n';
+      let csv = 'Test Type,Mode,Timestamp,Elapsed (ms),Call-to-Response (ms),Status,Accuracy (m),Latitude,Longitude,Speed (native),Calculated Speed,Position Age (ms),Is New Position,Hybrid Session,Error Code,Error Message\n';
+      
+      // Spoof detection tests
+      testData.spoofDetectionTests.forEach(test => {
+        test.samples.forEach(s => {
+          if (!s.error) {
+            csv += `Spoof Detection,spoof,${test.timestamp},${s.responseTime},,SUCCESS,${s.accuracy},${s.latitude},${s.longitude},${s.speed || ''},${s.calculatedSpeed || ''},${s.timestampAge},,,\n`;
+          }
+        });
+      });
       
       // Timeout tests
       testData.timeoutTests.forEach(test => {
         Object.entries(test.results).filter(([k]) => k.startsWith('tt_')).forEach(([key, value]) => {
-          csv += `Timeout ${key},timeout,${test.timestamp},${value.elapsed},,${value.status},${value.accuracy || ''},,,,${value.isCachedResponse ? 'No (cached)' : 'Yes'},${value.errorCode || ''},${value.errorMessage || ''}\n`;
+          csv += `Timeout ${key},timeout,${test.timestamp},${value.elapsed},,${value.status},${value.accuracy || ''},,,,${value.isCachedResponse ? 'cached' : ''},,,${value.errorCode || ''},${value.errorMessage || ''}\n`;
         });
       });
       
       // Native watch tests
       testData.nativeWatchTests.forEach(test => {
         test.results.forEach(r => {
-          csv += `Watch,native,${test.timestamp},${r.elapsed},${r.callToResponse || ''},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.timestamp ? Date.now() - r.timestamp : ''},${r.isNewPosition || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
+          if (!r.error) {
+            csv += `Watch,native,${test.timestamp},${r.elapsed},${r.callToResponse || ''},SUCCESS,${r.accuracy},${r.latitude},${r.longitude},${r.speed || ''},${r.calculatedSpeed || ''},${r.timestamp ? Date.now() - r.timestamp : ''},${r.isNewPosition},,\n`;
+          } else {
+            csv += `Watch,native,${test.timestamp},${r.elapsed},${r.callToResponse || ''},ERROR,,,,,,,,,${r.errorCode},${r.errorMessage}\n`;
+          }
         });
       });
       
       // Synthetic watch tests
       testData.syntheticWatchTests.forEach(test => {
         test.results.forEach(r => {
-          csv += `Watch,synthetic,${test.timestamp},${r.elapsed},${r.callToResponse || ''},${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.timestamp ? Date.now() - r.timestamp : ''},${r.isNewPosition || ''},${r.errorCode || ''},${r.errorMessage || ''}\n`;
+          if (!r.error) {
+            csv += `Watch,synthetic,${test.timestamp},${r.elapsed},${r.callToResponse || ''},SUCCESS,${r.accuracy},${r.latitude},${r.longitude},${r.speed || ''},${r.calculatedSpeed || ''},${r.timestamp ? Date.now() - r.timestamp : ''},${r.isNewPosition},,\n`;
+          } else {
+            csv += `Watch,synthetic,${test.timestamp},${r.elapsed},${r.callToResponse || ''},ERROR,,,,,,,,,${r.errorCode},${r.errorMessage}\n`;
+          }
+        });
+      });
+      
+      // Hybrid watch tests
+      testData.hybridWatchTests.forEach(test => {
+        test.results.forEach(r => {
+          if (!r.error) {
+            csv += `Watch,hybrid,${test.timestamp},${r.elapsed},${r.callToResponse || ''},SUCCESS,${r.accuracy},${r.latitude},${r.longitude},${r.speed || ''},${r.calculatedSpeed || ''},${r.timestamp ? Date.now() - r.timestamp : ''},${r.isNewPosition},${r.hybridSession || ''},\n`;
+          } else {
+            csv += `Watch,hybrid,${test.timestamp},${r.elapsed},${r.callToResponse || ''},ERROR,,,,,,,,${r.hybridSession || ''},${r.errorCode},${r.errorMessage}\n`;
+          }
         });
       });
       
       // Single tests
       testData.singleTests.forEach(r => {
-        csv += `Single,single,${r.timestamp},${r.elapsed},,${r.error ? 'ERROR' : 'SUCCESS'},${r.accuracy || ''},${r.latitude || ''},${r.longitude || ''},${r.positionAge || ''},,${r.errorCode || ''},${r.errorMessage || ''}\n`;
+        if (!r.error) {
+          csv += `Single,single,${r.timestamp},${r.elapsed},,SUCCESS,${r.accuracy},${r.latitude},${r.longitude},${r.speed || ''},,${r.positionAge},,,,\n`;
+        } else {
+          csv += `Single,single,${r.timestamp},${r.elapsed},,ERROR,,,,,,,,,${r.errorCode},${r.errorMessage}\n`;
+        }
       });
       
       const blob = new Blob([csv], { type: 'text/csv' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `geolocation-test-v2-${Date.now()}.csv`;
+      a.download = `geolocation-test-v3-${Date.now()}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     }
     
-    // Initialize UI
-    document.getElementById('syntheticIntervalConfig').style.display = 'none';
+    // Initialize UI - hide interval config for native mode by default
+    document.getElementById('intervalConfig').style.display = 'none';
   </script>
 </body>
 </html>
