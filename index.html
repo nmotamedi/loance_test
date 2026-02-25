@@ -82,7 +82,6 @@
     button.secondary { background: transparent; border-color: var(--border); color: var(--text-dim); }
     button.secondary:hover { border-color: var(--text-dim); color: var(--text); }
 
-    /* ---- Verdict banner ---- */
     .verdict-banner {
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -114,7 +113,6 @@
       font-size: 13px; color: var(--text-dim); line-height: 1.8; font-family: var(--mono);
     }
 
-    /* ---- Results area ---- */
     .results-area { border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
 
     .results-header {
@@ -198,8 +196,8 @@
     After all runs complete, a composite analysis checks four signals:<br>
     <strong>1. Timing</strong> — Did positions resolve impossibly fast?<br>
     <strong>2. Timestamp freshness</strong> — Is the position timestamp updating between runs, or frozen?<br>
-    <strong>3. Accuracy variation</strong> — Is accuracy refining over time (real GPS) or static (spoofed)?<br>
-    <strong>4. Position drift</strong> — Are coordinates shifting slightly (real) or identical (spoofed)?
+    <strong>3. Accuracy variation</strong> — Is accuracy refining over time (real GPS) or perfectly static (spoofed)?<br>
+    <strong>4. Position drift</strong> — Are coordinates shifting at all (real) or bit-identical (spoofed)?
   </div>
 
   <div class="config-section">
@@ -351,7 +349,6 @@
       const instantRuns = runs.filter(r => r.results.some(res => res.result === 'INSTANT'));
       const allInstantResults = runs.flatMap(r => r.results.filter(res => res.result === 'INSTANT'));
 
-      // Helper: get first instant result from a run
       const firstInstant = (run) => run.results.find(r => r.result === 'INSTANT');
 
       // ── Signal 1: Timing ──
@@ -398,18 +395,22 @@
       }
 
       // ── Signal 3: Accuracy variation ──
+      // FAIL = every value is bit-identical (spoofed tooling returns exact same float every time)
+      // WARN = values differ but by < 0.5m (borderline)
+      // PASS = meaningful variation (real GPS refining)
       if (instantRuns.length >= 2) {
         const accs = instantRuns.map(r => firstInstant(r).accuracy);
-        const uniqueAcc = new Set(accs.map(a => a.toFixed(6))).size;
+        // Bit-identical check: compare raw float strings to catch exact matches
+        const uniqueAcc = new Set(accs.map(a => String(a))).size;
         const minA = Math.min(...accs), maxA = Math.max(...accs);
         const range = maxA - minA;
 
         if (uniqueAcc === 1) {
           signals.push({ name: 'Accuracy static', status: 'fail',
-            detail: `Identical accuracy (${accs[0].toFixed(1)}m) across all ${instantRuns.length} instant runs` });
-        } else if (range < 1) {
+            detail: `Bit-identical accuracy (${accs[0]}m) across all ${instantRuns.length} instant runs` });
+        } else if (range < 0.5) {
           signals.push({ name: 'Accuracy variation', status: 'warn',
-            detail: `Minimal: ${minA.toFixed(1)}–${maxA.toFixed(1)}m (Δ${range.toFixed(2)}m) across ${instantRuns.length} runs` });
+            detail: `Minor: ${minA.toFixed(2)}–${maxA.toFixed(2)}m (Δ${range.toFixed(3)}m) across ${instantRuns.length} runs` });
         } else {
           signals.push({ name: 'Accuracy variation', status: 'pass',
             detail: `Varying: ${minA.toFixed(1)}–${maxA.toFixed(1)}m (Δ${range.toFixed(1)}m) across ${instantRuns.length} runs` });
@@ -419,24 +420,39 @@
       }
 
       // ── Signal 4: Position drift ──
+      // FAIL = coordinates are bit-identical across all runs (exact same lat/lng strings)
+      //        DevTools spoofing returns the same float values every single time.
+      // WARN = coordinates differ but total drift < 0.1m (very minor, could be either)
+      // PASS = any meaningful drift (real GPS jitter, even mm-level, produces different floats)
       if (instantRuns.length >= 2) {
-        const positions = instantRuns.map(r => { const res = firstInstant(r); return { lat: res.latitude, lng: res.longitude }; });
-        const distances = [];
-        for (let i = 1; i < positions.length; i++) {
-          distances.push(haversine(positions[i - 1].lat, positions[i - 1].lng, positions[i].lat, positions[i].lng));
-        }
-        const totalMove = distances.reduce((s, d) => s + d, 0);
-        const allZero = distances.every(d => d < 0.01);
+        const positions = instantRuns.map(r => {
+          const res = firstInstant(r);
+          return { lat: res.latitude, lng: res.longitude, latStr: String(res.latitude), lngStr: String(res.longitude) };
+        });
 
-        if (allZero) {
+        // Bit-identical check: are all lat AND lng strings exactly the same?
+        const uniqueLatStr = new Set(positions.map(p => p.latStr)).size;
+        const uniqueLngStr = new Set(positions.map(p => p.lngStr)).size;
+        const allBitIdentical = uniqueLatStr === 1 && uniqueLngStr === 1;
+
+        if (allBitIdentical) {
           signals.push({ name: 'Position frozen', status: 'fail',
-            detail: `Zero coordinate movement across ${instantRuns.length} runs` });
-        } else if (totalMove < 0.5) {
-          signals.push({ name: 'Position drift', status: 'warn',
-            detail: `Very minor drift: ${totalMove.toFixed(2)}m total across ${instantRuns.length} runs` });
+            detail: `Bit-identical coordinates across all ${instantRuns.length} runs (${positions[0].lat}, ${positions[0].lng})` });
         } else {
-          signals.push({ name: 'Position drift', status: 'pass',
-            detail: `Natural drift: ${totalMove.toFixed(1)}m total across ${instantRuns.length} runs` });
+          // There is some drift — measure it
+          const distances = [];
+          for (let i = 1; i < positions.length; i++) {
+            distances.push(haversine(positions[i - 1].lat, positions[i - 1].lng, positions[i].lat, positions[i].lng));
+          }
+          const totalMove = distances.reduce((s, d) => s + d, 0);
+
+          if (totalMove < 0.1) {
+            signals.push({ name: 'Position drift', status: 'pass',
+              detail: `Micro-drift: ${(totalMove * 100).toFixed(1)}cm total across ${instantRuns.length} runs — real GPS jitter` });
+          } else {
+            signals.push({ name: 'Position drift', status: 'pass',
+              detail: `Natural drift: ${totalMove.toFixed(2)}m total across ${instantRuns.length} runs` });
+          }
         }
       } else if (instantRuns.length === 0) {
         signals.push({ name: 'Position drift', status: 'pass', detail: 'No instant responses — n/a' });
