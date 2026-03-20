@@ -2,693 +2,829 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Sensor Harness</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QT Exhaustion Probe</title>
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;700&display=swap');
 
-  :root {
-    --bg: #0a0a0f;
-    --surface: #12121a;
-    --surface-2: #1a1a26;
-    --border: #2a2a3a;
-    --text: #e0e0e8;
-    --text-muted: #6a6a80;
-    --accent: #22d67a;
-    --accent-dim: rgba(34, 214, 122, 0.12);
-    --error: #f45866;
-    --error-dim: rgba(244, 88, 102, 0.12);
-    --warn: #f4a838;
-    --warn-dim: rgba(244, 168, 56, 0.12);
-    --null-val: #5a5a70;
-    --mono: 'JetBrains Mono', monospace;
-    --sans: 'DM Sans', sans-serif;
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--sans);
-    min-height: 100dvh;
-    padding: 0 0 80px 0;
-    -webkit-font-smoothing: antialiased;
+    font-family: 'DM Sans', sans-serif;
+    background: #0a0a0f;
+    color: #e0e0e8;
+    min-height: 100vh;
+    padding: 24px;
   }
 
-  header {
-    padding: 24px 20px 16px;
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 0;
-    background: var(--bg);
-    z-index: 10;
-  }
-
-  header h1 {
-    font-family: var(--mono);
-    font-size: 16px;
-    font-weight: 600;
-    letter-spacing: -0.02em;
-    color: var(--accent);
-  }
-
-  header p {
-    font-size: 12px;
-    color: var(--text-muted);
-    margin-top: 4px;
-  }
-
-  .ua-bar {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text-muted);
-    padding: 10px 20px;
-    border-bottom: 1px solid var(--border);
-    word-break: break-all;
-    line-height: 1.5;
-  }
-
-  .controls {
-    display: flex;
-    gap: 10px;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    position: sticky;
-    top: 69px;
-    background: var(--bg);
-    z-index: 9;
-  }
-
-  button {
-    font-family: var(--mono);
-    font-size: 12px;
-    font-weight: 600;
-    padding: 10px 16px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--surface);
-    color: var(--text);
-    cursor: pointer;
-    transition: all 0.15s;
-    flex: 1;
-  }
-
-  button:active { transform: scale(0.97); }
-
-  button.primary {
-    background: var(--accent);
-    color: var(--bg);
-    border-color: var(--accent);
-  }
-
-  button.primary:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
-
-  button.copy-btn {
-    font-size: 10px;
-    padding: 4px 8px;
-    flex: 0;
-  }
-
-  .section {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    animation: fadeIn 0.3s ease;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-
-  .section-title {
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .badge {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 600;
-    padding: 3px 8px;
-    border-radius: 4px;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .badge.ok { background: var(--accent-dim); color: var(--accent); }
-  .badge.err { background: var(--error-dim); color: var(--error); }
-  .badge.warn { background: var(--warn-dim); color: var(--warn); }
-  .badge.na { background: var(--surface-2); color: var(--text-muted); }
-
-  .data-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px;
-  }
-
-  .data-grid.two-col {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .data-cell {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 10px;
-  }
-
-  .data-cell .label {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 500;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
+  h1 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
     margin-bottom: 4px;
   }
 
-  .data-cell .value {
-    font-family: var(--mono);
+  .subtitle {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 20px;
+  }
+
+  .description {
+    font-size: 13px;
+    color: #999;
+    line-height: 1.6;
+    margin-bottom: 20px;
+    max-width: 800px;
+  }
+
+  .description strong { color: #ccc; }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+    align-items: flex-end;
+  }
+
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .control-group label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .control-group input, .control-group select {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    background: #16161f;
+    border: 1px solid #2a2a3a;
+    color: #e0e0e8;
+    padding: 8px 12px;
+    border-radius: 6px;
+    width: 120px;
+  }
+
+  button {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 8px 20px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+
+  button:hover { transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-run { background: #3b82f6; color: #fff; }
+  .btn-baseline { background: #8b5cf6; color: #fff; }
+  .btn-clear { background: #2a2a3a; color: #aaa; }
+  .btn-export { background: #16a34a; color: #fff; }
+
+  .section {
+    background: #12121a;
+    border: 1px solid #1e1e2e;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+
+  .section h2 {
+    font-family: 'JetBrains Mono', monospace;
     font-size: 14px;
     font-weight: 600;
-    word-break: break-all;
+    color: #ccc;
+    margin-bottom: 12px;
   }
 
-  .data-cell .value.null { color: var(--null-val); }
-  .data-cell .value.live { color: var(--accent); }
-
-  .sub-section {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid var(--border);
-  }
-
-  .sub-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-
-  .error-msg {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--error);
-    padding: 8px 10px;
-    background: var(--error-dim);
-    border-radius: 6px;
-    word-break: break-all;
-  }
-
-  .raw-output {
-    margin-top: 16px;
-    padding: 16px 20px;
-  }
-
-  .raw-output summary {
-    font-family: var(--mono);
+  .log-area {
+    font-family: 'JetBrains Mono', monospace;
     font-size: 12px;
-    font-weight: 600;
-    color: var(--text-muted);
-    cursor: pointer;
-    padding: 8px 0;
-  }
-
-  .raw-output pre {
-    font-family: var(--mono);
-    font-size: 11px;
-    line-height: 1.5;
-    color: var(--text);
-    background: var(--surface);
-    border: 1px solid var(--border);
+    line-height: 1.8;
+    background: #0a0a12;
+    border: 1px solid #1a1a28;
     border-radius: 6px;
     padding: 12px;
-    overflow-x: auto;
+    max-height: 500px;
+    overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-all;
-    margin-top: 8px;
   }
 
-  .timer {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text-muted);
-    padding: 8px 20px;
-    border-bottom: 1px solid var(--border);
+  .log-success { color: #4ade80; }
+  .log-error { color: #f87171; }
+  .log-info { color: #60a5fa; }
+  .log-warn { color: #fbbf24; }
+  .log-dim { color: #555; }
+  .log-header { color: #c084fc; font-weight: 600; }
+
+  .verdict-banner {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-top: 16px;
+    text-align: center;
   }
+
+  .verdict-exhausted { background: #dc262622; color: #f87171; border: 1px solid #dc262644; }
+  .verdict-clean { background: #16a34a22; color: #4ade80; border: 1px solid #16a34a44; }
+  .verdict-running { background: #3b82f622; color: #60a5fa; border: 1px solid #3b82f644; }
+  .verdict-inconclusive { background: #f59e0b22; color: #fbbf24; border: 1px solid #f59e0b44; }
+
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  .result-card {
+    background: #16161f;
+    border: 1px solid #2a2a3a;
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .result-card h3 {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #888;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+  }
+
+  .result-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .result-detail {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+  }
+
+  .history-entry {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    padding: 8px 12px;
+    background: #16161f;
+    border: 1px solid #1e1e2e;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .history-exhausted { border-left: 3px solid #f87171; }
+  .history-clean { border-left: 3px solid #4ade80; }
+  .history-inconclusive { border-left: 3px solid #fbbf24; }
 </style>
 </head>
 <body>
 
-<header>
-  <h1>// sensor_harness v2</h1>
-  <p>Production-identical collectSensorData()</p>
-</header>
+<h1>QT Exhaustion Probe</h1>
+<p class="subtitle">Same runTimeoutTest from production template → measures if burn kills subsequent getCurrentPosition</p>
 
-<div class="ua-bar" id="uaBar"></div>
+<p class="description">
+  <strong>Step 1:</strong> Click "Baseline Only" to confirm getCurrentPosition works without burn.<br>
+  <strong>Step 2:</strong> Click "Run QT + Final" to fire the QT burn, then a final getCurrentPosition.<br>
+  <strong>Step 3:</strong> Compare results across real location, DevTools spoof, extensions, mobile mock GPS.<br>
+  <strong>Step 4:</strong> Adjust parameters and repeat. Export all runs as JSON for analysis.
+</p>
 
 <div class="controls">
-  <button class="primary" id="btnCollect" onclick="runCollect()">Collect Snapshot</button>
-  <button class="copy-btn" onclick="copyRaw()">Copy</button>
+  <div class="control-group">
+    <label>QT Runs</label>
+    <input type="number" id="qtRuns" value="3" min="1" max="10">
+  </div>
+  <div class="control-group">
+    <label>Run Delay (ms)</label>
+    <input type="number" id="qtDelay" value="1000" min="0" max="10000">
+  </div>
+  <div class="control-group">
+    <label>Timeouts (csv)</label>
+    <input type="text" id="qtTimeouts" value="20,30,50" style="width:140px;">
+  </div>
+  <div class="control-group">
+    <label>Wait After QT (ms)</label>
+    <input type="number" id="waitAfterQt" value="0" min="0" max="30000">
+  </div>
+  <div class="control-group">
+    <label>Final Timeout (ms)</label>
+    <input type="number" id="finalTimeout" value="15000" min="1000" max="60000">
+  </div>
+  <div class="control-group">
+    <label>Final maxAge</label>
+    <input type="number" id="finalMaxAge" value="0" min="0" max="60000">
+  </div>
+  <div class="control-group">
+    <label>Final highAccuracy</label>
+    <select id="finalHighAccuracy">
+      <option value="true" selected>true</option>
+      <option value="false">false</option>
+    </select>
+  </div>
 </div>
 
-<div id="timerBar" class="timer" style="display:none"></div>
-<div id="sensorSections"></div>
+<div class="controls">
+  <button class="btn-run" id="btnQtFinal" onclick="runQtThenFinal()">Run QT + Final</button>
+  <button class="btn-baseline" id="btnBaseline" onclick="runBaselineOnly()">Baseline Only</button>
+  <button class="btn-baseline" id="btnQtOnly" onclick="runQtOnly()">QT Only (no final)</button>
+  <button class="btn-clear" onclick="clearAll()">Clear</button>
+  <button class="btn-export" onclick="exportAll()">Export All Runs</button>
+</div>
 
-<div class="raw-output">
-  <details>
-    <summary>Raw JSON — sensorData (as postBack would send it)</summary>
-    <pre id="rawSensorData">Hit "Collect Snapshot" to begin.</pre>
-  </details>
-  <details style="margin-top:8px">
-    <summary>Raw JSON — sensorErrors</summary>
-    <pre id="rawSensorErrors">{}</pre>
-  </details>
+<div id="verdictBanner"></div>
+
+<div class="results-grid" id="resultsGrid" style="display:none;">
+  <div class="result-card">
+    <h3>QT Burn</h3>
+    <div class="result-value" id="resBurn">—</div>
+    <div class="result-detail" id="resBurnDetail"></div>
+  </div>
+  <div class="result-card">
+    <h3>Final Call</h3>
+    <div class="result-value" id="resFinal">—</div>
+    <div class="result-detail" id="resFinalDetail"></div>
+  </div>
+  <div class="result-card">
+    <h3>QT Signals</h3>
+    <div class="result-value" id="resSignals">—</div>
+    <div class="result-detail" id="resSignalsDetail"></div>
+  </div>
+  <div class="result-card">
+    <h3>Verdict</h3>
+    <div class="result-value" id="resVerdict">—</div>
+    <div class="result-detail" id="resVerdictDetail"></div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:16px;">
+  <h2>Live Log</h2>
+  <div class="log-area" id="logArea"></div>
+</div>
+
+<div class="section">
+  <h2>Run History</h2>
+  <div id="historyArea"><span style="color:#555;font-size:12px;">No runs yet</span></div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════
-// PRODUCTION CODE — identical to template collectSensorData()
-// This block should match your template 1:1
-// ═══════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// EXACT runTimeoutTest from production template
+// ════════════════════════════════════════════════════════════
 
-var sensorData = {};
-sensorData['magnetometer'] = null;
-sensorData['gravity'] = null;
-sensorData['accelerometer'] = null;
-sensorData['gyroscope'] = null;
-sensorData['linearAcceleration'] = null;
-sensorData['deviceMotion'] = null;
-sensorData['deviceOrientation'] = null;
+function runTimeoutTest(onComplete, runCount, runDelay, testTimeouts) {
+  runCount = runCount || 3;
+  runDelay = runDelay || 1000;
+  testTimeouts = testTimeouts || [20, 30, 50];
 
-var sensorErrors = {};
+  var runs = [];
+  var currentRun = 0;
 
-function collectSensorData() {
-  var SENSOR_TIMEOUT = 3000;
-  var SENSOR_FREQ = 1;
+  function singleRun(runNumber, done) {
+    var results = [];
+    var completed = 0;
 
-  function tryGenericSensor(name, SensorClass) {
-    try {
-      var sensor = new SensorClass({ frequency: SENSOR_FREQ });
-      var timeout = setTimeout(function() {
-        sensor.stop();
-        sensorErrors[name] = 'timeout';
-      }, SENSOR_TIMEOUT);
+    testTimeouts.forEach(function(tt) {
+      var start = new Date().getTime();
 
-      sensor.addEventListener('reading', function() {
-        clearTimeout(timeout);
-        sensorData[name] = JSON.stringify({
-          'x': sensor['x'],
-          'y': sensor['y'],
-          'z': sensor['z'],
-          'timestamp': sensor['timestamp']
-        });
-        sensor.stop();
-      });
-      sensor.addEventListener('error', function(e) {
-        clearTimeout(timeout);
-        sensorErrors[name] = e.error.name + ': ' + e.error.message;
-      });
-      sensor.start();
-    } catch (e) {
-      sensorErrors[name] = e.name + ': ' + e.message;
-    }
-  }
-
-  // --- Generic Sensor APIs (Chromium) ---
-
-  if (typeof Magnetometer !== 'undefined') {
-    tryGenericSensor('magnetometer', Magnetometer);
-  } else {
-    sensorErrors['magnetometer'] = 'unsupported';
-  }
-
-  if (typeof GravitySensor !== 'undefined') {
-    tryGenericSensor('gravity', GravitySensor);
-  } else {
-    sensorErrors['gravity'] = 'unsupported';
-  }
-
-  if (typeof Accelerometer !== 'undefined') {
-    tryGenericSensor('accelerometer', Accelerometer);
-  } else {
-    sensorErrors['accelerometer'] = 'unsupported';
-  }
-
-  if (typeof Gyroscope !== 'undefined') {
-    tryGenericSensor('gyroscope', Gyroscope);
-  } else {
-    sensorErrors['gyroscope'] = 'unsupported';
-  }
-
-  if (typeof LinearAccelerationSensor !== 'undefined') {
-    tryGenericSensor('linearAcceleration', LinearAccelerationSensor);
-  } else {
-    sensorErrors['linearAcceleration'] = 'unsupported';
-  }
-
-  // --- Legacy fallbacks (Safari, Firefox, older Chrome) ---
-  function handleMotion(event) {
-    window.removeEventListener('devicemotion', handleMotion);
-    var a = event['acceleration'] || {};
-    var ag = event['accelerationIncludingGravity'] || {};
-    var rr = event['rotationRate'] || {};
-    sensorData['deviceMotion'] = JSON.stringify({
-      'acceleration': { 'x': a['x'], 'y': a['y'], 'z': a['z'] },
-      'accelerationIncludingGravity': { 'x': ag['x'], 'y': ag['y'], 'z': ag['z'] },
-      'rotationRate': { 'alpha': rr['alpha'], 'beta': rr['beta'], 'gamma': rr['gamma'] },
-      'interval': event['interval'],
-      'timestamp': new Date().getTime()
+      navigator.geolocation.getCurrentPosition(
+        function(position) {
+          var elapsed = new Date().getTime() - start;
+          var entry = {};
+          entry['timeoutCase'] = tt;
+          entry['timeout'] = false;
+          entry['elapsed'] = elapsed;
+          entry['accuracy'] = position.coords.accuracy;
+          entry['lat'] = position.coords.latitude;
+          entry['long'] = position.coords.longitude;
+          entry['alt'] = position.coords.altitude;
+          entry['timestamp'] = position.timestamp;
+          entry['age'] = new Date().getTime() - position.timestamp;
+          results.push(entry);
+          completed++;
+          if (completed === testTimeouts.length) done(results);
+        },
+        function(error) {
+          var elapsed = new Date().getTime() - start;
+          var entry = {};
+          entry['timeoutCase'] = tt;
+          entry['timeout'] = true;
+          entry['elapsed'] = elapsed;
+          entry['err'] = error.code;
+          results.push(entry);
+          completed++;
+          if (completed === testTimeouts.length) done(results);
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: tt }
+      );
     });
   }
 
-  function handleOrientation(event) {
-    window.removeEventListener('deviceorientation', handleOrientation);
-    sensorData['deviceOrientation'] = JSON.stringify({
-      'alpha': event['alpha'],
-      'beta': event['beta'],
-      'gamma': event['gamma'],
-      'absolute': event['absolute'],
-      'timestamp': new Date().getTime()
-    });
-  }
-
-  // iOS 13+ requires permission request
-  if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
-    DeviceMotionEvent.requestPermission().then(function(state) {
-      if (state === 'granted') {
-        window.addEventListener('devicemotion', handleMotion);
+  function nextRun() {
+    currentRun++;
+    singleRun(currentRun, function(results) {
+      runs.push(results);
+      if (currentRun < runCount) {
+        setTimeout(nextRun, runDelay);
       } else {
-        sensorErrors['deviceMotion'] = 'denied';
+        onComplete(runs);
       }
-    }).catch(function(e) {
-      sensorErrors['deviceMotion'] = e.name + ': ' + e.message;
     });
-  } else if (typeof DeviceMotionEvent !== 'undefined') {
-    window.addEventListener('devicemotion', handleMotion);
-  } else {
-    sensorErrors['deviceMotion'] = 'unsupported';
   }
 
-  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-    DeviceOrientationEvent.requestPermission().then(function(state) {
-      if (state === 'granted') {
-        window.addEventListener('deviceorientation', handleOrientation);
-      } else {
-        sensorErrors['deviceOrientation'] = 'denied';
-      }
-    }).catch(function(e) {
-      sensorErrors['deviceOrientation'] = e.name + ': ' + e.message;
-    });
-  } else if (typeof DeviceOrientationEvent !== 'undefined') {
-    window.addEventListener('deviceorientation', handleOrientation);
-  } else {
-    sensorErrors['deviceOrientation'] = 'unsupported';
-  }
-
-  // Cleanup legacy listeners after timeout
-  setTimeout(function() {
-    window.removeEventListener('devicemotion', handleMotion);
-    window.removeEventListener('deviceorientation', handleOrientation);
-    if (!sensorData['deviceMotion'] && !sensorErrors['deviceMotion']) {
-      sensorErrors['deviceMotion'] = 'no_event';
-    }
-    if (!sensorData['deviceOrientation'] && !sensorErrors['deviceOrientation']) {
-      sensorErrors['deviceOrientation'] = 'no_event';
-    }
-  }, SENSOR_TIMEOUT);
+  nextRun();
 }
 
-// ═══════════════════════════════════════════════════════════════
-// HARNESS UI — display layer only, does not touch collection
-// ═══════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════
+// UI / Logging
+// ════════════════════════════════════════════════════════════
 
-document.getElementById('uaBar').textContent = navigator.userAgent;
+var allRuns = [];
+var logArea = document.getElementById('logArea');
 
-function runCollect() {
-  var btn = document.getElementById('btnCollect');
-  btn.disabled = true;
-  btn.textContent = 'Collecting\u2026';
-
-  // Reset state exactly as production would
-  sensorData = {};
-  sensorData['magnetometer'] = null;
-  sensorData['gravity'] = null;
-  sensorData['accelerometer'] = null;
-  sensorData['gyroscope'] = null;
-  sensorData['linearAcceleration'] = null;
-  sensorData['deviceMotion'] = null;
-  sensorData['deviceOrientation'] = null;
-  sensorErrors = {};
-
-  var startTime = Date.now();
-  collectSensorData();
-
-  // Poll and re-render until timeout passes
-  var pollInterval = setInterval(function() {
-    var elapsed = Date.now() - startTime;
-    document.getElementById('timerBar').style.display = 'block';
-    document.getElementById('timerBar').textContent = 'Elapsed: ' + elapsed + 'ms / 3000ms';
-    renderUI();
-
-    if (elapsed >= 3500) {
-      clearInterval(pollInterval);
-      document.getElementById('timerBar').textContent = 'Collection complete \u2014 ' + elapsed + 'ms';
-      btn.disabled = false;
-      btn.textContent = 'Collect Snapshot';
-      renderUI();
-    }
-  }, 250);
+function log(msg, cls) {
+  var line = document.createElement('div');
+  line.className = cls || '';
+  line.textContent = '[' + new Date().toISOString().split('T')[1].slice(0,12) + '] ' + msg;
+  logArea.appendChild(line);
+  logArea.scrollTop = logArea.scrollHeight;
 }
 
-function renderUI() {
-  var container = document.getElementById('sensorSections');
-  var html = '';
-
-  var genericNames = [
-    ['magnetometer', 'Magnetometer', '\u03BCT'],
-    ['gravity', 'GravitySensor', 'm/s\u00B2'],
-    ['accelerometer', 'Accelerometer', 'm/s\u00B2'],
-    ['gyroscope', 'Gyroscope', 'rad/s'],
-    ['linearAcceleration', 'LinearAcceleration', 'm/s\u00B2'],
-  ];
-
-  for (var i = 0; i < genericNames.length; i++) {
-    html += renderGenericSection(genericNames[i][0], genericNames[i][1], genericNames[i][2]);
-  }
-
-  html += renderDeviceMotionSection();
-  html += renderDeviceOrientationSection();
-
-  container.innerHTML = html;
-
-  document.getElementById('rawSensorData').textContent = JSON.stringify(sensorData, null, 2);
-  document.getElementById('rawSensorErrors').textContent = JSON.stringify(sensorErrors, null, 2);
+function clearAll() {
+  logArea.innerHTML = '';
+  document.getElementById('verdictBanner').innerHTML = '';
+  document.getElementById('resultsGrid').style.display = 'none';
 }
 
-function parseIfString(val) {
-  if (typeof val === 'string') {
-    try { return JSON.parse(val); } catch(e) { return null; }
-  }
-  return val;
+function setButtons(disabled) {
+  document.getElementById('btnQtFinal').disabled = disabled;
+  document.getElementById('btnBaseline').disabled = disabled;
+  document.getElementById('btnQtOnly').disabled = disabled;
 }
 
-function renderGenericSection(key, label, unit) {
-  var raw = sensorData[key];
-  var data = parseIfString(raw);
-  var error = sensorErrors[key];
-  var badge = getBadge(data, error);
-
-  var body = '';
-  if (data) {
-    body =
-      '<div class="data-grid">' +
-        dataCell('X', fmtNum(data['x']), unit) +
-        dataCell('Y', fmtNum(data['y']), unit) +
-        dataCell('Z', fmtNum(data['z']), unit) +
-      '</div>' +
-      '<div class="data-grid two-col" style="margin-top:8px">' +
-        dataCell('Timestamp', data['timestamp'] ? new Date(data['timestamp']).toISOString() : 'null', '') +
-        dataCell('Magnitude', fmtNum(magnitude(data['x'], data['y'], data['z'])), unit) +
-      '</div>' +
-      '<div style="margin-top:8px"><div class="sub-label">Raw string (as sent to server)</div>' +
-        '<div class="error-msg" style="color:var(--text-muted);background:var(--surface-2);font-size:10px">' + escHtml(String(raw)) + '</div>' +
-      '</div>';
-  } else if (error) {
-    body = '<div class="error-msg">' + escHtml(error) + '</div>';
-  } else {
-    body = '<div class="error-msg" style="color:var(--text-muted);background:var(--surface-2)">Waiting\u2026</div>';
-  }
-
-  return '<div class="section">' +
-    '<div class="section-header">' +
-      '<span class="section-title">' + label + '</span>' +
-      badge +
-    '</div>' +
-    body +
-  '</div>';
-}
-
-function renderDeviceMotionSection() {
-  var raw = sensorData['deviceMotion'];
-  var data = parseIfString(raw);
-  var error = sensorErrors['deviceMotion'];
-  var badge = getBadge(data, error);
-
-  var body = '';
-  if (data) {
-    var a = data['acceleration'] || {};
-    var ag = data['accelerationIncludingGravity'] || {};
-    var rr = data['rotationRate'] || {};
-
-    body =
-      '<div class="sub-label">Acceleration</div>' +
-      '<div class="data-grid">' +
-        dataCell('X', fmtNum(a['x']), 'm/s\u00B2') +
-        dataCell('Y', fmtNum(a['y']), 'm/s\u00B2') +
-        dataCell('Z', fmtNum(a['z']), 'm/s\u00B2') +
-      '</div>' +
-      '<div class="sub-section">' +
-        '<div class="sub-label">Accel + Gravity</div>' +
-        '<div class="data-grid">' +
-          dataCell('X', fmtNum(ag['x']), 'm/s\u00B2') +
-          dataCell('Y', fmtNum(ag['y']), 'm/s\u00B2') +
-          dataCell('Z', fmtNum(ag['z']), 'm/s\u00B2') +
-        '</div>' +
-      '</div>' +
-      '<div class="sub-section">' +
-        '<div class="sub-label">Rotation Rate</div>' +
-        '<div class="data-grid">' +
-          dataCell('\u03B1', fmtNum(rr['alpha']), '\u00B0/s') +
-          dataCell('\u03B2', fmtNum(rr['beta']), '\u00B0/s') +
-          dataCell('\u03B3', fmtNum(rr['gamma']), '\u00B0/s') +
-        '</div>' +
-      '</div>' +
-      '<div class="data-grid two-col" style="margin-top:8px">' +
-        dataCell('Interval', data['interval'] + 'ms', '') +
-        dataCell('Timestamp', new Date(data['timestamp']).toISOString(), '') +
-      '</div>' +
-      '<div style="margin-top:8px"><div class="sub-label">Raw string (as sent to server)</div>' +
-        '<div class="error-msg" style="color:var(--text-muted);background:var(--surface-2);font-size:10px">' + escHtml(String(raw)) + '</div>' +
-      '</div>';
-  } else if (error) {
-    body = '<div class="error-msg">' + escHtml(error) + '</div>';
-  } else {
-    body = '<div class="error-msg" style="color:var(--text-muted);background:var(--surface-2)">Waiting\u2026</div>';
-  }
-
-  return '<div class="section">' +
-    '<div class="section-header">' +
-      '<span class="section-title">DeviceMotion (legacy)</span>' +
-      badge +
-    '</div>' +
-    body +
-  '</div>';
-}
-
-function renderDeviceOrientationSection() {
-  var raw = sensorData['deviceOrientation'];
-  var data = parseIfString(raw);
-  var error = sensorErrors['deviceOrientation'];
-  var badge = getBadge(data, error);
-
-  var body = '';
-  if (data) {
-    body =
-      '<div class="data-grid">' +
-        dataCell('\u03B1 compass', fmtNum(data['alpha']), '\u00B0') +
-        dataCell('\u03B2 tilt fb', fmtNum(data['beta']), '\u00B0') +
-        dataCell('\u03B3 tilt lr', fmtNum(data['gamma']), '\u00B0') +
-      '</div>' +
-      '<div class="data-grid two-col" style="margin-top:8px">' +
-        dataCell('Absolute', String(data['absolute']), '') +
-        dataCell('Timestamp', new Date(data['timestamp']).toISOString(), '') +
-      '</div>' +
-      '<div style="margin-top:8px"><div class="sub-label">Raw string (as sent to server)</div>' +
-        '<div class="error-msg" style="color:var(--text-muted);background:var(--surface-2);font-size:10px">' + escHtml(String(raw)) + '</div>' +
-      '</div>';
-  } else if (error) {
-    body = '<div class="error-msg">' + escHtml(error) + '</div>';
-  } else {
-    body = '<div class="error-msg" style="color:var(--text-muted);background:var(--surface-2)">Waiting\u2026</div>';
-  }
-
-  return '<div class="section">' +
-    '<div class="section-header">' +
-      '<span class="section-title">DeviceOrientation (legacy)</span>' +
-      badge +
-    '</div>' +
-    body +
-  '</div>';
-}
-
-function getBadge(data, error) {
-  if (data) {
-    var hasReal = JSON.stringify(data).match(/:\s*-?\d+\.?\d*/);
-    if (hasReal) return '<span class="badge ok">Live</span>';
-    return '<span class="badge warn">Null vals</span>';
-  }
-  if (error === 'unsupported') return '<span class="badge na">N/A</span>';
-  if (error) return '<span class="badge err">Error</span>';
-  return '<span class="badge na">\u2014</span>';
-}
-
-function dataCell(label, value, unit) {
-  var isNull = value === 'null' || value === null || value === undefined;
-  var cls = isNull ? 'null' : 'live';
-  var display = isNull ? '\u2014' : value + (unit ? ' <span style="opacity:0.5;font-size:10px">' + unit + '</span>' : '');
-  return '<div class="data-cell">' +
-    '<div class="label">' + label + '</div>' +
-    '<div class="value ' + cls + '">' + display + '</div>' +
-  '</div>';
-}
-
-function fmtNum(n) {
-  if (n === null || n === undefined) return 'null';
-  return Number(n).toFixed(4);
-}
-
-function magnitude(x, y, z) {
-  if (x === null || y === null || z === null) return null;
-  return Math.sqrt(x * x + y * y + z * z);
-}
-
-function escHtml(s) {
-  var d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
-}
-
-function copyRaw() {
-  var payload = {
-    sensorData: sensorData,
-    sensorErrors: sensorErrors,
-    userAgent: navigator.userAgent,
-    timestamp: new Date().toISOString()
+function getConfig() {
+  return {
+    qtRuns: parseInt(document.getElementById('qtRuns').value),
+    qtDelay: parseInt(document.getElementById('qtDelay').value),
+    qtTimeouts: document.getElementById('qtTimeouts').value.split(',').map(function(s) { return parseInt(s.trim()); }),
+    waitAfterQt: parseInt(document.getElementById('waitAfterQt').value),
+    finalTimeout: parseInt(document.getElementById('finalTimeout').value),
+    finalMaxAge: parseInt(document.getElementById('finalMaxAge').value),
+    finalHighAccuracy: document.getElementById('finalHighAccuracy').value === 'true'
   };
-  navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(function() {
-    var btn = document.querySelector('.copy-btn');
-    btn.textContent = 'Copied!';
-    setTimeout(function() { btn.textContent = 'Copy'; }, 1500);
+}
+
+// ════════════════════════════════════════════════════════════
+// QT Analysis (same logic as server-side qt-analysis.service)
+// ════════════════════════════════════════════════════════════
+
+function analyzeQtRuns(runs) {
+  var instantRuns = [];
+  var allInstant = [];
+
+  for (var i = 0; i < runs.length; i++) {
+    var hasInstant = false;
+    for (var j = 0; j < runs[i].length; j++) {
+      if (!runs[i][j].timeout) {
+        hasInstant = true;
+        allInstant.push(runs[i][j]);
+      }
+    }
+    if (hasInstant) instantRuns.push(runs[i]);
+  }
+
+  function firstInstant(run) {
+    for (var k = 0; k < run.length; k++) {
+      if (!run[k].timeout) return run[k];
+    }
+    return null;
+  }
+
+  var signals = {};
+
+  // Timing
+  if (instantRuns.length === runs.length) signals.timing = 'fail';
+  else if (instantRuns.length === 0) signals.timing = 'pass';
+  else signals.timing = 'warn';
+
+  // Timestamp frozen
+  if (instantRuns.length >= 2) {
+    var ts = {};
+    for (var i = 0; i < instantRuns.length; i++) ts[firstInstant(instantRuns[i]).timestamp] = true;
+    signals.timestamp = Object.keys(ts).length === 1 ? 'fail' : 'pass';
+  } else {
+    signals.timestamp = 'n/a';
+  }
+
+  // Accuracy static
+  if (instantRuns.length >= 2) {
+    var accs = {};
+    for (var i = 0; i < instantRuns.length; i++) accs[String(firstInstant(instantRuns[i]).accuracy)] = true;
+    signals.accuracy = Object.keys(accs).length === 1 ? 'fail' : 'pass';
+  } else {
+    signals.accuracy = 'n/a';
+  }
+
+  // Position frozen
+  if (instantRuns.length >= 2) {
+    var lats = {}, lngs = {};
+    for (var i = 0; i < instantRuns.length; i++) {
+      var r = firstInstant(instantRuns[i]);
+      lats[String(r.lat)] = true;
+      lngs[String(r['long'])] = true;
+    }
+    signals.position = (Object.keys(lats).length === 1 && Object.keys(lngs).length === 1) ? 'fail' : 'pass';
+  } else {
+    signals.position = 'n/a';
+  }
+
+  var failCount = 0;
+  for (var k in signals) { if (signals[k] === 'fail') failCount++; }
+
+  return {
+    signals: signals,
+    failCount: failCount,
+    instantRuns: instantRuns.length,
+    totalRuns: runs.length,
+    allInstantResults: allInstant
+  };
+}
+
+// ════════════════════════════════════════════════════════════
+// Final getCurrentPosition call
+// ════════════════════════════════════════════════════════════
+
+function finalGetPosition(config, callback) {
+  log('FINAL: getCurrentPosition (timeout=' + config.finalTimeout + 'ms, maxAge=' + config.finalMaxAge + ', highAccuracy=' + config.finalHighAccuracy + ')', 'log-info');
+
+  var start = performance.now();
+
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      var elapsed = Math.round(performance.now() - start);
+      var result = {
+        outcome: 'success',
+        elapsed: elapsed,
+        accuracy: pos.coords.accuracy,
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        timestamp: pos.timestamp,
+        age: Date.now() - pos.timestamp
+      };
+      log('FINAL: ✓ ' + elapsed + 'ms | lat=' + pos.coords.latitude.toFixed(6) + ' acc=' + pos.coords.accuracy.toFixed(1) + 'm age=' + result.age + 'ms', 'log-success');
+      callback(result);
+    },
+    function(err) {
+      var elapsed = Math.round(performance.now() - start);
+      var result = {
+        outcome: 'error',
+        elapsed: elapsed,
+        code: err.code,
+        message: err.message
+      };
+      log('FINAL: ✗ ' + elapsed + 'ms | code=' + err.code + ' (' + err.message + ')', 'log-error');
+      callback(result);
+    },
+    {
+      enableHighAccuracy: config.finalHighAccuracy,
+      maximumAge: config.finalMaxAge,
+      timeout: config.finalTimeout
+    }
+  );
+}
+
+// ════════════════════════════════════════════════════════════
+// Log QT run details
+// ════════════════════════════════════════════════════════════
+
+function logQtRuns(runs) {
+  for (var i = 0; i < runs.length; i++) {
+    log('  Run ' + (i + 1) + ':', 'log-dim');
+    for (var j = 0; j < runs[i].length; j++) {
+      var r = runs[i][j];
+      if (r.timeout) {
+        log('    [' + r.timeoutCase + 'ms] ✗ timeout ' + r.elapsed + 'ms, err=' + r.err, 'log-error');
+      } else {
+        log('    [' + r.timeoutCase + 'ms] ✓ ' + r.elapsed + 'ms | acc=' + r.accuracy + 'm lat=' + r.lat + ' ts=' + r.timestamp + ' age=' + r.age + 'ms', 'log-success');
+      }
+    }
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// Show results
+// ════════════════════════════════════════════════════════════
+
+function showResults(runData) {
+  var grid = document.getElementById('resultsGrid');
+  grid.style.display = 'grid';
+
+  var banner = document.getElementById('verdictBanner');
+
+  // QT Burn
+  var burnEl = document.getElementById('resBurn');
+  var burnDetail = document.getElementById('resBurnDetail');
+  if (runData.qtRuns) {
+    var analysis = runData.qtAnalysis;
+    var totalCalls = 0;
+    for (var i = 0; i < runData.qtRuns.length; i++) totalCalls += runData.qtRuns[i].length;
+    burnEl.textContent = analysis.instantRuns + '/' + analysis.totalRuns + ' instant';
+    burnEl.style.color = analysis.instantRuns === analysis.totalRuns ? '#f87171' : analysis.instantRuns === 0 ? '#4ade80' : '#fbbf24';
+    burnDetail.textContent = totalCalls + ' total getCurrentPosition calls';
+  } else {
+    burnEl.textContent = 'skipped';
+    burnEl.style.color = '#888';
+    burnDetail.textContent = '';
+  }
+
+  // Final
+  var finalEl = document.getElementById('resFinal');
+  var finalDetail = document.getElementById('resFinalDetail');
+  if (runData.finalResult) {
+    if (runData.finalResult.outcome === 'success') {
+      finalEl.textContent = runData.finalResult.elapsed + 'ms ✓';
+      finalEl.style.color = '#4ade80';
+      finalDetail.textContent = 'acc=' + runData.finalResult.accuracy.toFixed(1) + 'm, age=' + runData.finalResult.age + 'ms';
+    } else {
+      finalEl.textContent = runData.finalResult.elapsed + 'ms ✗';
+      finalEl.style.color = '#f87171';
+      finalDetail.textContent = 'code=' + runData.finalResult.code + ': ' + runData.finalResult.message;
+    }
+  } else {
+    finalEl.textContent = 'n/a';
+    finalEl.style.color = '#888';
+    finalDetail.textContent = '';
+  }
+
+  // Signals
+  var sigEl = document.getElementById('resSignals');
+  var sigDetail = document.getElementById('resSignalsDetail');
+  if (runData.qtAnalysis) {
+    var s = runData.qtAnalysis.signals;
+    var parts = [];
+    for (var k in s) {
+      var icon = s[k] === 'fail' ? '✗' : s[k] === 'pass' ? '✓' : '—';
+      parts.push(k + ':' + icon);
+    }
+    sigEl.textContent = runData.qtAnalysis.failCount + ' fails';
+    sigEl.style.color = runData.qtAnalysis.failCount >= 3 ? '#f87171' : runData.qtAnalysis.failCount === 0 ? '#4ade80' : '#fbbf24';
+    sigDetail.textContent = parts.join(' | ');
+  } else {
+    sigEl.textContent = '—';
+    sigEl.style.color = '#888';
+    sigDetail.textContent = '';
+  }
+
+  // Verdict
+  var verdEl = document.getElementById('resVerdict');
+  var verdDetail = document.getElementById('resVerdictDetail');
+
+  if (runData.mode === 'baseline') {
+    if (runData.finalResult.outcome === 'success') {
+      verdEl.textContent = 'BASELINE OK';
+      verdEl.style.color = '#4ade80';
+      verdDetail.textContent = 'getCurrentPosition works without QT burn';
+      banner.innerHTML = '<div class="verdict-banner verdict-clean">Baseline OK — getCurrentPosition works normally</div>';
+    } else {
+      verdEl.textContent = 'BASELINE FAIL';
+      verdEl.style.color = '#f87171';
+      verdDetail.textContent = 'getCurrentPosition fails even without burn';
+      banner.innerHTML = '<div class="verdict-banner verdict-exhausted">Baseline failed — check permissions/sensor</div>';
+    }
+  } else if (runData.mode === 'qt_only') {
+    verdEl.textContent = 'QT DATA';
+    verdEl.style.color = '#60a5fa';
+    verdDetail.textContent = 'QT ran without final call — check signals';
+    banner.innerHTML = '<div class="verdict-banner verdict-running">QT data collected — no final call made</div>';
+  } else {
+    // qt + final
+    var exhausted = runData.finalResult && runData.finalResult.outcome === 'error' && runData.finalResult.code === 3;
+    var qtAllInstant = runData.qtAnalysis && runData.qtAnalysis.instantRuns === runData.qtAnalysis.totalRuns;
+
+    if (exhausted && qtAllInstant) {
+      verdEl.textContent = 'EXHAUSTED';
+      verdEl.style.color = '#f87171';
+      verdDetail.textContent = 'QT burn killed final getCurrentPosition — spoof signal';
+      banner.innerHTML = '<div class="verdict-banner verdict-exhausted">EXHAUSTION — QT burn caused final call timeout (spoof signal)</div>';
+    } else if (exhausted && !qtAllInstant) {
+      verdEl.textContent = 'TIMEOUT';
+      verdEl.style.color = '#fbbf24';
+      verdDetail.textContent = 'Final timed out but QT had mixed results';
+      banner.innerHTML = '<div class="verdict-banner verdict-inconclusive">Final timed out — QT had mixed results, inconclusive</div>';
+    } else if (!exhausted && runData.finalResult) {
+      verdEl.textContent = 'NO EXHAUST';
+      verdEl.style.color = '#4ade80';
+      verdDetail.textContent = 'Final call succeeded after QT burn';
+      banner.innerHTML = '<div class="verdict-banner verdict-clean">No exhaustion — final call succeeded after QT burn</div>';
+    }
+  }
+
+  // History
+  addHistory(runData);
+}
+
+// ════════════════════════════════════════════════════════════
+// Run History
+// ════════════════════════════════════════════════════════════
+
+function addHistory(runData) {
+  var area = document.getElementById('historyArea');
+  if (allRuns.length === 1) area.innerHTML = '';
+
+  var div = document.createElement('div');
+  div.className = 'history-entry';
+
+  var verdict = '—';
+  var cls = 'history-inconclusive';
+
+  if (runData.mode === 'baseline') {
+    verdict = runData.finalResult.outcome === 'success' ? 'BASELINE OK' : 'BASELINE FAIL';
+    cls = runData.finalResult.outcome === 'success' ? 'history-clean' : 'history-exhausted';
+  } else if (runData.mode === 'qt_only') {
+    verdict = 'QT ONLY (' + (runData.qtAnalysis ? runData.qtAnalysis.failCount + ' fails' : '?') + ')';
+    cls = 'history-inconclusive';
+  } else {
+    var exhausted = runData.finalResult && runData.finalResult.outcome === 'error' && runData.finalResult.code === 3;
+    if (exhausted) {
+      verdict = 'EXHAUSTED (' + (runData.finalResult.elapsed / 1000).toFixed(1) + 's timeout)';
+      cls = 'history-exhausted';
+    } else if (runData.finalResult) {
+      verdict = 'OK (' + runData.finalResult.elapsed + 'ms)';
+      cls = 'history-clean';
+    }
+  }
+
+  var qtInfo = runData.qtAnalysis ? runData.qtAnalysis.instantRuns + '/' + runData.qtAnalysis.totalRuns + ' instant' : 'no QT';
+  var finalInfo = runData.finalResult ? (runData.finalResult.outcome === 'success' ? runData.finalResult.elapsed + 'ms' : 'code ' + runData.finalResult.code) : 'n/a';
+
+  div.className += ' ' + cls;
+  div.innerHTML = '<span>#' + allRuns.length + ' <strong>' + verdict + '</strong></span>' +
+    '<span>QT: ' + qtInfo + ' | Final: ' + finalInfo + ' | ' + runData.config.qtRuns + 'runs/' + runData.config.qtDelay + 'ms/' + runData.config.qtTimeouts.join(',') + '</span>';
+
+  area.insertBefore(div, area.firstChild);
+}
+
+// ════════════════════════════════════════════════════════════
+// Test Modes
+// ════════════════════════════════════════════════════════════
+
+function runQtThenFinal() {
+  clearAll();
+  setButtons(true);
+  var config = getConfig();
+
+  log('══════════════════════════════════════════', 'log-dim');
+  log('QT + FINAL TEST', 'log-header');
+  log('QT: ' + config.qtRuns + ' runs, ' + config.qtDelay + 'ms delay, timeouts=[' + config.qtTimeouts.join(',') + ']', 'log-dim');
+  log('Final: timeout=' + config.finalTimeout + 'ms, maxAge=' + config.finalMaxAge + ', highAccuracy=' + config.finalHighAccuracy, 'log-dim');
+  log('══════════════════════════════════════════', 'log-dim');
+
+  document.getElementById('verdictBanner').innerHTML = '<div class="verdict-banner verdict-running">⏳ Running QT burn...</div>';
+
+  var testStart = performance.now();
+
+  runTimeoutTest(function(runs) {
+    log('', '');
+    log('QT COMPLETE — ' + runs.length + ' runs collected', 'log-info');
+    logQtRuns(runs);
+
+    var analysis = analyzeQtRuns(runs);
+    log('', '');
+    log('QT Analysis: ' + analysis.failCount + ' fails, ' + analysis.instantRuns + '/' + analysis.totalRuns + ' instant', 'log-info');
+    for (var k in analysis.signals) {
+      log('  ' + k + ': ' + analysis.signals[k], analysis.signals[k] === 'fail' ? 'log-error' : 'log-success');
+    }
+
+    document.getElementById('verdictBanner').innerHTML = '<div class="verdict-banner verdict-running">⏳ Waiting ' + config.waitAfterQt + 'ms, then final call...</div>';
+
+    setTimeout(function() {
+      log('', '');
+      finalGetPosition(config, function(finalResult) {
+        var totalTime = Math.round(performance.now() - testStart);
+        log('', '');
+        log('Total time: ' + totalTime + 'ms', 'log-info');
+
+        var runData = {
+          mode: 'qt_final',
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+          config: config,
+          qtRuns: runs,
+          qtAnalysis: analysis,
+          finalResult: finalResult,
+          totalTime: totalTime
+        };
+        allRuns.push(runData);
+        showResults(runData);
+        setButtons(false);
+      });
+    }, config.waitAfterQt);
+
+  }, config.qtRuns, config.qtDelay, config.qtTimeouts);
+}
+
+function runBaselineOnly() {
+  clearAll();
+  setButtons(true);
+  var config = getConfig();
+
+  log('══════════════════════════════════════════', 'log-dim');
+  log('BASELINE ONLY (no QT burn)', 'log-header');
+  log('══════════════════════════════════════════', 'log-dim');
+
+  document.getElementById('verdictBanner').innerHTML = '<div class="verdict-banner verdict-running">⏳ Running baseline...</div>';
+
+  finalGetPosition(config, function(finalResult) {
+    var runData = {
+      mode: 'baseline',
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      config: config,
+      qtRuns: null,
+      qtAnalysis: null,
+      finalResult: finalResult,
+      totalTime: finalResult.elapsed
+    };
+    allRuns.push(runData);
+    showResults(runData);
+    setButtons(false);
   });
 }
+
+function runQtOnly() {
+  clearAll();
+  setButtons(true);
+  var config = getConfig();
+
+  log('══════════════════════════════════════════', 'log-dim');
+  log('QT ONLY (no final call)', 'log-header');
+  log('QT: ' + config.qtRuns + ' runs, ' + config.qtDelay + 'ms delay, timeouts=[' + config.qtTimeouts.join(',') + ']', 'log-dim');
+  log('══════════════════════════════════════════', 'log-dim');
+
+  document.getElementById('verdictBanner').innerHTML = '<div class="verdict-banner verdict-running">⏳ Running QT...</div>';
+
+  runTimeoutTest(function(runs) {
+    log('', '');
+    log('QT COMPLETE', 'log-info');
+    logQtRuns(runs);
+
+    var analysis = analyzeQtRuns(runs);
+    log('', '');
+    log('QT Analysis: ' + analysis.failCount + ' fails, ' + analysis.instantRuns + '/' + analysis.totalRuns + ' instant', 'log-info');
+
+    var runData = {
+      mode: 'qt_only',
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      config: config,
+      qtRuns: runs,
+      qtAnalysis: analysis,
+      finalResult: null,
+      totalTime: null
+    };
+    allRuns.push(runData);
+    showResults(runData);
+    setButtons(false);
+
+  }, config.qtRuns, config.qtDelay, config.qtTimeouts);
+}
+
+function exportAll() {
+  if (allRuns.length === 0) {
+    log('No runs to export', 'log-warn');
+    return;
+  }
+  var blob = new Blob([JSON.stringify(allRuns, null, 2)], { type: 'application/json' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'qt-exhaustion-probe-' + Date.now() + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 </script>
+
 </body>
 </html>
